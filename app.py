@@ -1,5 +1,4 @@
-# app.py  – streamlined stock-chatbot dashboard
-
+# app.py ─ Multi-ticker Market-Movement Chatbot
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -9,76 +8,67 @@ from config import DEFAULT_MODEL
 from stock_utils import get_stock_summary
 from openai_client import ask_openai
 
-#───────────────── 0. PAGE CONFIG ─────────────────#
 st.set_page_config(page_title="Market Movement Chatbot", layout="wide")
 st.title("📈 Market Movement Chatbot")
 
-#───────────────── 1. SESSION STATE ───────────────#
+# ─────────────────── Session state ───────────────────
 if "history" not in st.session_state:
     st.session_state.history = []
+def add_to_history(role, txt): st.session_state.history.append((role, txt))
 
-def add_to_history(role: str, text: str):
-    st.session_state.history.append((role, text))
-
-#───────────────── 2. CACHED HELPERS ──────────────#
+# ─────────────────── Cached helpers ──────────────────
 @st.cache_data(ttl=300)
-def fetch_stock_df(tickers: list[str], period: str) -> pd.DataFrame:
-    """Pull Close prices and drop tickers with no data."""
+def fetch_stock_df(tickers, period):
     df = yf.download(tickers, period=period, progress=False)["Close"]
     return df.dropna(axis=1, how="all")
 
 @st.cache_data(ttl=300)
-def fetch_competitors_llm(model: str, name: str, domain: str) -> list[str]:
-    """Ask LLM for up to 7 competitor tickers and sanitize output."""
+def fetch_competitors_llm(model, name, domain):
     prompt = (
-        f"List ONLY the top 7 stock ticker symbols of public companies that compete "
-        f"with {name} in the '{domain}' domain. Return a plain Python list, e.g. "
-        f"['MSFT', 'GOOG', 'NVDA']."
+        f"List ONLY the top 7 stock ticker symbols of companies that compete with {name} "
+        f"in the '{domain}' domain. Return a Python list like ['MSFT','GOOG']."
     )
     resp = ask_openai(model, "You are a helpful stock analyst.", prompt)
     try:
         lst = eval(resp.strip(), {"__builtins__": None}, {})
-        return [t.strip().upper() for t in lst if isinstance(t, str)]
+        return [t.upper() for t in lst if isinstance(t, str)]
     except Exception:
         lines = [ln.strip('",[] ') for ln in resp.splitlines()]
-        return [ln.upper() for ln in lines if ln.isalpha() and 0 < len(ln) <= 5][:7]
+        return [ln.upper() for ln in lines if ln.isalpha()][:7]
 
-#───────────────── 3. SIDEBAR: settings + snapshot ─#
+# ─────────────────── Sidebar: settings ───────────────
 with st.sidebar.expander("⚙️ Settings", expanded=False):
     model = st.selectbox(
         "OpenAI Model",
-        options=[DEFAULT_MODEL, "gpt-4.1-mini", "gpt-4o-mini",
-                 "gpt-3.5-turbo", "gpt-4", "gpt-4o"],
-        index=0,
+        [DEFAULT_MODEL, "gpt-4.1-mini", "gpt-4o-mini", "gpt-3.5-turbo", "gpt-4", "gpt-4o"],
+        0,
     )
     if st.button("🧹 Clear Chat History"):
         st.session_state.history = []
 
-#───────────────── 4. MAIN TICKER INPUT ───────────#
-ticker = st.text_input("Enter Stock Symbol (e.g., AAPL, TSLA)", "AAPL").upper().strip()
-if not ticker:
+# ─────────────────── Ticker input (basket) ───────────
+tickers_raw = st.text_input(
+    "Enter one or more tickers (comma-separated)", "AAPL, MSFT"
+)
+tickers = [t.strip().upper() for t in tickers_raw.split(",") if t.strip()]
+if not tickers:
     st.stop()
 
-#─ 4.a  LLM stock summary (stored in chat) ─#
-summary = get_stock_summary(ticker)
-add_to_history("bot", summary)
+primary = tickers[0]  # first symbol drives snapshot & sector
 
-#─ 4.b  Basic metadata (handle YF rate-limits) ─#
+# ─────────────────── Snapshot & metadata ─────────────
+summary = get_stock_summary(primary); add_to_history("bot", summary)
 try:
-    info     = yf.Ticker(ticker).info
-    sector   = info.get("sector", "")
-    industry = info.get("industry", "")
-    longname = info.get("longName", ticker)
+    info = yf.Ticker(primary).info
+    sector, industry = info.get("sector", ""), info.get("industry", "")
 except Exception:
-    info = {}; sector = industry = ""; longname = ticker
+    info, sector, industry = {}, "", ""
 
-#─ 4.c  Latest snapshot metrics ─#
 try:
-    prices5 = yf.Ticker(ticker).history(period="5d")["Close"]
-    last_px = prices5.iloc[-1]
-    pct_px  = (last_px - prices5.iloc[-2]) / prices5.iloc[-2] * 100
+    hist = yf.Ticker(primary).history(period="5d")["Close"]
+    last_px = hist.iloc[-1]; pct_px = (last_px - hist.iloc[-2]) / hist.iloc[-2] * 100
 except Exception:
-    last_px, pct_px = float("nan"), float("nan")
+    last_px = pct_px = float("nan")
 
 with st.sidebar:
     st.markdown("### ℹ️ Snapshot")
@@ -86,104 +76,85 @@ with st.sidebar:
     st.metric("Market Cap", f"${info.get('marketCap',0)/1e9:.1f} B")
     st.metric("P/E", str(info.get("trailingPE", "—")))
 
-#───────────────── 5. DOMAIN & COMPETITORS ────────#
+# ─────────────────── Domain + competitor logic ──────
 domains = [d for d in (sector, industry) if d] or ["General"]
-domain_selected = st.selectbox("Which domain would you like to explore?", domains)
-competitors_all = fetch_competitors_llm(model, longname, domain_selected)
+domain_selected = st.selectbox("Domain context", domains)
 
-#───────────────── 6. TABS ────────────────────────#
+if len(tickers) == 1:
+    competitors_all = fetch_competitors_llm(model, primary, domain_selected)
+    basket = [primary] + competitors_all[:3]        # default compare list
+else:
+    competitors_all = tickers[1:]                   # treat extras as comps
+    basket = tickers                                # compare exactly what user typed
+
+# ─────────────────── Tabs ───────────────────────────
 tab_compare, tab_strategy, tab_chat = st.tabs(["📈 Compare", "🎯 Strategy", "💬 Chat"])
 
-#── 6.a  COMPARE TAB ──────────────────────────────#
+# 1) Compare tab
 with tab_compare:
     st.subheader("Price Comparison")
-
-    comps_choice = st.multiselect(
-        "Select competitors", options=competitors_all,
-        default=competitors_all[:3]
-    )
-    duration = st.selectbox("Duration", ["1mo", "3mo", "6mo", "1y"], index=2)
-    prices_df = fetch_stock_df([ticker] + comps_choice, duration)
-
-    if prices_df.empty:
-        st.error("No price data for selected symbols.")
+    comps_selected = st.multiselect("Select symbols to plot", basket, default=basket)
+    duration = st.selectbox("Duration", ["1mo", "3mo", "6mo", "1y"], 2)
+    price_df = fetch_stock_df(comps_selected, duration)
+    if price_df.empty:
+        st.error("No price data.")
     else:
         st.plotly_chart(
-            px.line(prices_df, title=f"Prices ({duration})",
-                    labels={"value":"Price","variable":"Ticker"}),
+            px.line(price_df, title=f"Prices ({duration})",
+                    labels={"value": "Price", "variable": "Ticker"}),
             use_container_width=True
         )
-
         st.markdown("### Latest Prices")
-        cols = st.columns(len(prices_df.columns))
-        for col, sym in zip(cols, prices_df):
-            series = prices_df[sym]
-            last   = series.iloc[-1]
-            delta  = series.pct_change().iloc[-1] * 100
-            spark  = px.line(series, height=80)
-            spark.update_layout(
+        cols = st.columns(len(price_df.columns))
+        for c, sym in zip(cols, price_df.columns):
+            ser, last, delta = price_df[sym], price_df[sym].iloc[-1], price_df[sym].pct_change().iloc[-1]*100
+            spark = px.line(ser, height=80).update_layout(
                 showlegend=False, margin=dict(l=0,r=0,t=0,b=0),
-                xaxis=dict(showticklabels=False),
-                yaxis=dict(showticklabels=False)
+                xaxis=dict(showticklabels=False), yaxis=dict(showticklabels=False)
             )
-            col.plotly_chart(spark, use_container_width=True)
-            col.metric(sym, f"${last:.2f}", f"{delta:+.2f}%")
+            c.plotly_chart(spark, use_container_width=True)
+            c.metric(sym, f"${last:.2f}", f"{delta:+.2f}%")
 
-#── 6.b  STRATEGY TAB ─────────────────────────────#
+# 2) Strategy tab
 with tab_strategy:
     st.subheader("Strategy Assistant")
+    default_sector, default_avoid = sector or industry or "", primary
+    sector_in = st.text_input("Sector focus", default_sector)
+    goal      = st.selectbox("Positioning goal", ["Long", "Short", "Hedged", "Neutral"])
+    avoid_sym = st.text_input("Hedge / avoid ticker", default_avoid)
+    capital   = st.number_input("Capital (USD)", 1000, step=1000, value=10000)
+    horizon   = st.slider("Time horizon (months)", 1, 24, 6)
 
-    # Prefill helpers
-    default_sector  = sector or industry or ""
-    default_avoid   = ticker
-
-    # Core inputs
-    sector_in   = st.text_input("Sector", default_sector, placeholder="e.g., AI")
-    goal        = st.selectbox("Positioning Goal", ["Long", "Short", "Hedged", "Neutral"])
-    avoid_sym   = st.text_input("Stock to hedge / avoid", default_avoid)
-
-    # NEW: capital & horizon
-    capital_usd = st.number_input("Capital to allocate (USD)", 1000, step=1000, value=10000)
-    horizon_mo  = st.slider("Time horizon (months)", 1, 24, 6)
-
-    # Risk controls
-    with st.expander("⚖️ Risk Controls", expanded=False):
-        beta_rng  = st.slider("Beta match (pair legs)", 0.5, 1.5, (0.8,1.2), 0.05)
+    with st.expander("⚖️ Risk Controls", False):
+        beta_rng  = st.slider("Beta match band", 0.5, 1.5, (0.8,1.2), 0.05)
         stop_loss = st.slider("Stop-loss for shorts (%)", 1, 20, 10)
 
-    # Suggest strategy
     if st.button("Suggest Strategy"):
-        user_intent = (
-            f"Design a {goal.lower()} strategy in the {sector_in} sector. "
-            f"Hedge/avoid {avoid_sym}. Allocate ${capital_usd} over {horizon_mo} months. "
-            f"Pairs must have betas in {beta_rng[0]:.2f}-{beta_rng[1]:.2f}; "
-            f"short legs get a {stop_loss}% stop-loss. "
-            "Return 2-3 positions with dollar sizing and rationale."
+        basket_txt = ", ".join(comps_selected or [primary])
+        prompt = (
+            f"Design a {goal.lower()} strategy using the basket [{basket_txt}]. "
+            f"Sector focus: {sector_in}. Hedge/avoid {avoid_sym}. "
+            f"Allocate ${capital} over {horizon} months. "
+            f"Pair betas within {beta_rng[0]:.2f}-{beta_rng[1]:.2f}; "
+            f"shorts must carry a {stop_loss}% stop-loss. "
+            "Return 2–3 positions with dollar sizing and rationale."
         )
-        with st.spinner("Generating strategy…"):
+        with st.spinner("Generating…"):
             plan = ask_openai(
                 model,
-                "You are a portfolio strategist. Output position table + narrative.",
-                user_intent,
+                "You are a portfolio strategist. Output a table + narrative.",
+                prompt,
             )
         st.markdown("### 📌 Suggested Strategy")
         st.write(plan)
 
-#── 6.c  CHAT TAB ─────────────────────────────────#
+# 3) Chat tab
 with tab_chat:
     for role, msg in st.session_state.history:
         st.chat_message(role).write(msg)
-
-    q = st.chat_input("Ask a question…")
+    q = st.chat_input("Ask anything…")
     if q:
         add_to_history("user", q)
-        ctx = (
-            f"Summary: {summary}\n"
-            f"Domain: {domain_selected}\n"
-            f"Competitors: {', '.join(competitors_all)}"
-        )
-        a = ask_openai(model,
-                       "You are a helpful market analyst. Use context.",
-                       ctx + "\n\n" + q)
-        add_to_history("assistant", a)
-        st.experimental_rerun()
+        ctx = f"Summary: {summary}\nDomain: {domain_selected}\nTickers: {', '.join(basket)}"
+        ans = ask_openai(model, "You are a helpful market analyst.", ctx + "\n\n" + q)
+        add_to_history("assistant", ans); st.experimental_rerun()
