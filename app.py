@@ -1,3 +1,4 @@
+import time
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -133,15 +134,22 @@ with tab_comp:
         cols = st.columns(len(competitors))
         for c, sym in zip(cols, competitors):
             try:
-                data = yf.download(sym, period="1mo", progress=False)["Close"]
+                # SAFER one-by-one fetch:
+                time.sleep(0.1)
+                data = yf.Ticker(sym).history(period="1mo")
                 if data.empty:
-                    raise ValueError("Empty")
-                last_price = data.iloc[-1]
-                delta = data.pct_change().iloc[-1] * 100
+                    raise ValueError("No data returned")
+                last_price = data["Close"].iloc[-1]
+                delta = data["Close"].pct_change().iloc[-1] * 100
+
                 c.metric(sym, f"${last_price:.2f}", f"{delta:+.2f}%")
-                spark = px.line(data, height=80, width=150)
-                c.plotly_chart(spark, use_container_width=True, config={"displayModeBar": False})
-            except Exception:
+                spark = px.line(data["Close"], height=80, width=150)
+                c.plotly_chart(
+                    spark,
+                    use_container_width=True,
+                    config={"displayModeBar": False}
+                )
+            except Exception as e:
                 c.metric(sym, "—", "—")
     else:
         st.error("❌ No valid competitors found.")
