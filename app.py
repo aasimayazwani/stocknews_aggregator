@@ -136,8 +136,13 @@ with tab_strategy:
 
     sector_interest = st.text_input("Sector you're interested in", placeholder="e.g., EV, AI, Semiconductors")
     goal = st.selectbox("What is your positioning goal?", ["Long", "Short", "Hedged", "Neutral"])
-    concern = st.text_input("Any stock to hedge against or avoid?", placeholder="e.g., TSLA")
-
+    #concern = st.text_input("Any stock to hedge against or avoid?", placeholder="e.g., TSLA")
+    default_concern = ticker if ticker else ""
+    concern = st.text_input(
+        "Any stock to hedge against or avoid?",
+        value=default_concern,
+        placeholder="e.g., TSLA"
+    )
     if st.button("Suggest Strategy"):
         user_intent = f"""
         I want a strategy in the {sector_interest} sector.
