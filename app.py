@@ -57,17 +57,17 @@ try:
     company_name = info.get("longName", ticker)
     sector = info.get("sector")
     industry = info.get("industry")
-except Exception:
-    info = {}
-    company_name = ticker
-    sector = "Technology"  # fallback domain
-    industry = None
+except:
+    info, company_name, sector, industry = {}, ticker, "Technology", None
+
 domains = [d for d in (sector, industry) if d] or ["General"]
 domain_selected = st.selectbox("Which domain would you like to explore?", domains)
 all_competitors = fetch_competitors_llm(model, company_name, domain_selected)
 
 # ───────────── Tabs ─────────────
-tab_summary, tab_compare, tab_chat = st.tabs(["📊 Summary", "📈 Compare", "💬 Chat"])
+tab_summary, tab_compare, tab_strategy, tab_chat = st.tabs(
+    ["📊 Summary", "📈 Compare", "🎯 Strategy", "💬 Chat"]
+)
 
 # ───────────── Summary Tab ─────────────
 with tab_summary:
@@ -91,7 +91,6 @@ with tab_summary:
 with tab_compare:
     st.subheader("📈 Compare Price Movement")
 
-    # Selection controls
     selected_comps = st.multiselect("Select competitors to compare", options=all_competitors, default=all_competitors[:3])
     duration = st.selectbox("Select comparison duration", ["1mo", "3mo", "6mo", "1y"], index=2)
 
@@ -103,7 +102,6 @@ with tab_compare:
         df = df.drop(columns=[ticker], errors="ignore")
         ticker = None
 
-    # Price line chart
     if not df.empty:
         st.plotly_chart(
             px.line(df, title=f"Price Comparison ({duration})", labels={"value": "Price", "variable": "Ticker"}),
@@ -112,7 +110,6 @@ with tab_compare:
     else:
         st.error("No valid price data found for selected symbols.")
 
-    # Metric Cards
     st.markdown("### 💹 Latest Prices and Change")
     valid_comps = [sym for sym in compare_symbols if sym in df.columns]
     cols = st.columns(len(valid_comps))
@@ -121,8 +118,6 @@ with tab_compare:
             sub = df[sym]
             latest = sub.iloc[-1]
             delta = sub.pct_change().iloc[-1] * 100
-
-            # Sparkline above
             spark = px.line(sub, height=80)
             spark.update_layout(
                 showlegend=False,
@@ -134,6 +129,31 @@ with tab_compare:
             c.metric(sym, f"${latest:.2f}", f"{delta:+.2f}%")
         except:
             c.metric(sym, "—", "—")
+
+# ───────────── Strategy Tab ─────────────
+with tab_strategy:
+    st.subheader("🎯 Strategy Assistant")
+
+    sector_interest = st.text_input("Sector you're interested in", placeholder="e.g., EV, AI, Semiconductors")
+    goal = st.selectbox("What is your positioning goal?", ["Long", "Short", "Hedged", "Neutral"])
+    concern = st.text_input("Any stock to hedge against or avoid?", placeholder="e.g., TSLA")
+
+    if st.button("Suggest Strategy"):
+        user_intent = f"""
+        I want a strategy in the {sector_interest} sector.
+        I am interested in a {goal.lower()} position.
+        I want to hedge against or avoid: {concern if concern else 'none'}.
+        Suggest a set of 2-3 stock or ETF positions I can take to express this view.
+        Output a strategy with rationale.
+        """
+        with st.spinner("Analyzing strategy..."):
+            strategy_response = ask_openai(
+                model,
+                "You are a portfolio strategist. Give thoughtful long/short ideas using public stocks or ETFs.",
+                user_intent,
+            )
+        st.markdown("### 📌 Suggested Strategy")
+        st.write(strategy_response)
 
 # ───────────── Chat Tab ─────────────
 with tab_chat:
