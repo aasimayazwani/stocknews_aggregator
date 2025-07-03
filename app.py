@@ -134,27 +134,42 @@ with tab_compare:
 with tab_strategy:
     st.subheader("🎯 Strategy Assistant")
 
-    sector_interest = st.text_input("Sector you're interested in", placeholder="e.g., EV, AI, Semiconductors")
-    goal = st.selectbox("What is your positioning goal?", ["Long", "Short", "Hedged", "Neutral"])
-    #concern = st.text_input("Any stock to hedge against or avoid?", placeholder="e.g., TSLA")
-    default_concern = ticker if ticker else ""
+    # ――― Prefill helpers ―――
+    default_sector  = sector or industry or ""
+    default_concern = ticker or ""
+
+    # Sector input (pre-filled)
+    selected_sector = st.text_input(
+        "Sector you're interested in",
+        value=default_sector,
+        placeholder="e.g., EV, AI, Semiconductors"
+    )
+
+    # Positioning goal
+    goal = st.selectbox(
+        "What is your positioning goal?",
+        ["Long", "Short", "Hedged", "Neutral"],
+        index=0
+    )
+
+    # Stock to hedge / avoid (pre-filled)
     concern = st.text_input(
         "Any stock to hedge against or avoid?",
         value=default_concern,
         placeholder="e.g., TSLA"
     )
+
+    # Suggest button
     if st.button("Suggest Strategy"):
-        user_intent = f"""
-        I want a strategy in the {sector_interest} sector.
-        I am interested in a {goal.lower()} position.
-        I want to hedge against or avoid: {concern if concern else 'none'}.
-        Suggest a set of 2-3 stock or ETF positions I can take to express this view.
-        Output a strategy with rationale.
-        """
-        with st.spinner("Analyzing strategy..."):
+        user_intent = (
+            f"I want a {goal.lower()} strategy in the {selected_sector} sector. "
+            f"I want to hedge against or avoid: {concern}. "
+            f"Suggest 2-3 stock or ETF positions with rationale."
+        )
+        with st.spinner("Analyzing strategy…"):
             strategy_response = ask_openai(
                 model,
-                "You are a portfolio strategist. Give thoughtful long/short ideas using public stocks or ETFs.",
+                "You are a portfolio strategist. Provide thoughtful long/short ideas with rationale.",
                 user_intent,
             )
         st.markdown("### 📌 Suggested Strategy")
