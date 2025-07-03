@@ -52,9 +52,16 @@ if not ticker:
 summary = get_stock_summary(ticker)
 add_to_history("bot", summary)
 
-info = yf.Ticker(ticker).info or {}
-company_name = info.get("longName", ticker)
-sector, industry = info.get("sector"), info.get("industry")
+try:
+    info = yf.Ticker(ticker).info
+    company_name = info.get("longName", ticker)
+    sector = info.get("sector")
+    industry = info.get("industry")
+except Exception:
+    info = {}
+    company_name = ticker
+    sector = "Technology"  # fallback domain
+    industry = None
 domains = [d for d in (sector, industry) if d] or ["General"]
 domain_selected = st.selectbox("Which domain would you like to explore?", domains)
 all_competitors = fetch_competitors_llm(model, company_name, domain_selected)
