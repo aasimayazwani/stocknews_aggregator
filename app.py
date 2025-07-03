@@ -29,20 +29,28 @@ def fetch_stock_df(tickers: list[str], period: str = "6mo") -> pd.DataFrame:
     return df
 
 @st.cache_data(ttl=300)
+@st.cache_data(ttl=300)
 def fetch_competitors_llm(model: str, name: str, domain: str) -> list[str]:
-    """Ask the LLM for a competitor list, return tickers only."""
+    """
+    Ask the LLM for a competitor list in the given domain.
+    Returns a list of ticker symbols.
+    """
     prompt = (
         f"You are a financial analyst. List the top 5 public companies "
         f"that compete with {name} in the “{domain}” domain. "
         f"Return only the ticker symbols, as a Python list."
     )
     resp = ask_openai(model, "You are a helpful stock analyst.", prompt)
-    # assume the LLM returns something like: ["MSFT", "GOOG", "AMZN", ...]
+    # Parse the LLM response into a Python list
     try:
         return eval(resp)
-    except:
-        # fallback: split lines
-        return [line.strip().split()[0].strip('",[]') for line in resp.splitlines()]
+    except Exception:
+        # Fallback: grab first token of each line
+        return [
+            line.strip().split()[0].strip('",[]')
+            for line in resp.splitlines()
+            if line.strip()
+        ]
 
 # ——————————————————————————————————————————————————————————————
 # Sidebar: model selector & clear history
@@ -84,6 +92,7 @@ domains  = [d for d in (sector, industry) if d]
 
 if domains:
     domain = st.selectbox("Which domain to explore?", domains)
+    #comps = fetch_competitors_llm(model, name, domain)
     comps = fetch_competitors_llm(model, name, domain)
     st.markdown("#### 🔍 Competitors in this domain:")
     st.write(", ".join(comps))
