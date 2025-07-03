@@ -43,7 +43,11 @@ with st.sidebar.expander("⚙️ Settings", expanded=False):
     ])
     if st.button("🧹 Clear Chat"):
         st.session_state.history = []
-
+with st.sidebar:
+    st.markdown("### ℹ️ Snapshot")
+    st.metric("Price", f"${latest:.2f}", f"{pct:+.2f}%")
+    st.metric("Market Cap", f"${info.get('marketCap',0)/1e9:.1f} B")
+    st.metric("P/E", str(info.get("trailingPE", '—')))
 # ───────────── Stock Input ─────────────
 ticker = st.text_input("Enter Stock Symbol (e.g., AAPL, TSLA)", "AAPL").upper().strip()
 if not ticker:
@@ -65,9 +69,8 @@ domain_selected = st.selectbox("Which domain would you like to explore?", domain
 all_competitors = fetch_competitors_llm(model, company_name, domain_selected)
 
 # ───────────── Tabs ─────────────
-tab_summary, tab_compare, tab_strategy, tab_chat = st.tabs(
-    ["📊 Summary", "📈 Compare", "🎯 Strategy", "💬 Chat"]
-)
+tab_compare, tab_strategy, tab_chat = st.tabs(["📈 Compare", "🎯 Strategy", "💬 Chat"])
+
 
 # ───────────── Summary Tab ─────────────
 with tab_summary:
