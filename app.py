@@ -131,47 +131,69 @@ with tab_compare:
             c.metric(sym, "—", "—")
 
 # ───────────── Strategy Tab ─────────────
+# ───────────── Strategy Tab ─────────────
 with tab_strategy:
     st.subheader("🎯 Strategy Assistant")
 
-    # ――― Prefill helpers ―――
+    # Autofill helpers from earlier metadata
     default_sector  = sector or industry or ""
     default_concern = ticker or ""
 
-    # Sector input (pre-filled)
+    # ── Core inputs ──
     selected_sector = st.text_input(
         "Sector you're interested in",
         value=default_sector,
         placeholder="e.g., EV, AI, Semiconductors"
     )
 
-    # Positioning goal
     goal = st.selectbox(
         "What is your positioning goal?",
         ["Long", "Short", "Hedged", "Neutral"],
         index=0
     )
 
-    # Stock to hedge / avoid (pre-filled)
     concern = st.text_input(
         "Any stock to hedge against or avoid?",
         value=default_concern,
         placeholder="e.g., TSLA"
     )
 
-    # Suggest button
-    if st.button("Suggest Strategy"):
-        user_intent = (
-            f"I want a {goal.lower()} strategy in the {selected_sector} sector. "
-            f"I want to hedge against or avoid: {concern}. "
-            f"Suggest 2-3 stock or ETF positions with rationale."
+    # ── Risk fine-tuning expander ──
+    with st.expander("⚖️ Advanced Risk Controls", expanded=False):
+        beta_range = st.slider(
+            "Target beta range for long/short legs (sector-neutral pairs)",
+            min_value=0.5,
+            max_value=1.5,
+            value=(0.8, 1.2),
+            step=0.05
         )
+        stop_loss = st.slider(
+            "Stop-loss trigger (%) for each short leg",
+            min_value=1,
+            max_value=20,
+            value=10,
+            step=1,
+            help="Percentage move against the position that triggers a cover."
+        )
+
+    # ── Generate strategy ──
+    if st.button("Suggest Strategy"):
+        user_intent = f"""
+        I want a {goal.lower()} strategy in the {selected_sector} sector.
+        I want to hedge against or avoid: {concern}.
+        The long/short pair(s) should have betas within {beta_range[0]:.2f}–{beta_range[1]:.2f}
+        of each other to stay sector-neutral.
+        Each short leg should include a stop-loss at {stop_loss}% adverse move.
+        Suggest 2-3 stock or ETF positions with clear rationale and show how the stop-loss works.
+        """
+
         with st.spinner("Analyzing strategy…"):
             strategy_response = ask_openai(
                 model,
-                "You are a portfolio strategist. Provide thoughtful long/short ideas with rationale.",
+                "You are a portfolio strategist. Provide thoughtful long/short ideas that respect the given beta and stop-loss constraints.",
                 user_intent,
             )
+
         st.markdown("### 📌 Suggested Strategy")
         st.write(strategy_response)
 
