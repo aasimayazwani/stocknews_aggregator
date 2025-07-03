@@ -1,5 +1,5 @@
 # required libraries
 streamlit
-openai
+openai>=1.0.0
 yfinance
 python-dotenv>=1.0
