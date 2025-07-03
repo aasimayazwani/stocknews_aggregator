@@ -4,60 +4,62 @@ import yfinance as yf
 import pandas as pd
 import plotly.express as px
 
-from config import DEFAULT_MODEL
-from stock_utils import get_stock_summary
-from openai_client import ask_openai
+from config import DEFAULT_MODEL          # your config file
+from stock_utils import get_stock_summary # existing helper
+from openai_client import ask_openai      # MUST accept (model, system, user)
 
-st.set_page_config(page_title="Market Movement Chatbot", layout="wide")
-st.title("📈 Market Movement Chatbot")
+# ───────────────────── Page & Global Setup ─────────────────────
+st.set_page_config(
+    page_title="Market Movement Chatbot",
+    page_icon="📈",
+    layout="wide",
+)
 
-# ——————————————————————————————————————————————————————————————
-# Session State: history of (role, text)
+# Persist chat history
 if "history" not in st.session_state:
     st.session_state.history = []
 
 def add_to_history(role: str, text: str):
     st.session_state.history.append((role, text))
 
-# ——————————————————————————————————————————————————————————————
-# Caching data fetches
+# ───────────────────── Caching helpers ─────────────────────────
 @st.cache_data(ttl=300)
 def fetch_stock_df(tickers: list[str], period: str = "6mo") -> pd.DataFrame:
-    """Download historical close prices for a list of tickers."""
-    df = yf.download(tickers, period=period)["Close"]
-    df = df.dropna(axis=1, how="all")  # drop symbols with no data
-    return df
+    """Historical close prices for the list of tickers."""
+    df = yf.download(tickers, period=period, progress=False)["Close"]
+    return df.dropna(axis=1, how="all")
 
-@st.cache_data(ttl=300)
 @st.cache_data(ttl=300)
 def fetch_competitors_llm(model: str, name: str, domain: str) -> list[str]:
     """
-    Ask the LLM for a competitor list in the given domain.
-    Returns a list of ticker symbols.
+    Ask the LLM for competitor tickers in the specified domain.
+    Returns a list of symbols (strings).
     """
     prompt = (
         f"You are a financial analyst. List the top 5 public companies "
         f"that compete with {name} in the “{domain}” domain. "
-        f"Return only the ticker symbols, as a Python list."
+        f"Return ONLY the ticker symbols, as a Python list."
     )
     resp = ask_openai(model, "You are a helpful stock analyst.", prompt)
-    # Parse the LLM response into a Python list
-    try:
-        return eval(resp)
-    except Exception:
-        # Fallback: grab first token of each line
-        return [
-            line.strip().split()[0].strip('",[]')
-            for line in resp.splitlines()
-            if line.strip()
-        ]
 
-# ——————————————————————————————————————————————————————————————
-# Sidebar: model selector & clear history
-with st.sidebar:
-    st.header("Settings")
+    # Attempt to evaluate a proper Python list
+    try:
+        tickers = eval(resp)
+        if isinstance(tickers, list):
+            return [t.strip().upper() for t in tickers]
+    except Exception:
+        pass  # fall through to naive parse
+
+    # Fallback: first token per line
+    return [
+        line.strip().split()[0].strip('",[]').upper()
+        for line in resp.splitlines() if line.strip()
+    ]
+
+# ───────────────────── Sidebar Settings ────────────────────────
+with st.sidebar.expander("⚙️ Settings", expanded=False):
     model = st.selectbox(
-        "Model",
+        "OpenAI Model",
         options=[
             DEFAULT_MODEL,
             "gpt-4.1-mini",
@@ -68,66 +70,119 @@ with st.sidebar:
         ],
         index=0,
     )
-    if st.button("Clear Chat History"):
+    if st.button("🧹 Clear Chat History"):
         st.session_state.history = []
 
-# ——————————————————————————————————————————————————————————————
-# 1) Ticker input
-ticker = st.text_input("Enter Stock Symbol (e.g., AAPL, TSLA)", "AAPL") \
-             .upper().strip()
+# ───────────────────── Ticker Input ────────────────────────────
+ticker = (
+    st.text_input("Enter Stock Symbol (e.g., AAPL, TSLA)", "AAPL")
+    .upper()
+    .strip()
+)
+
 if not ticker:
     st.stop()
 
-# 2) Summary
+# ───────────────────── Core Data Fetching ──────────────────────
 summary = get_stock_summary(ticker)
-st.markdown(f"#### Stock Summary:\n{summary}")
-add_to_history("bot", summary)
+add_to_history("bot", summary)  # first message shown in chat
 
-# 3) Fetch sector/industry
+# Get company info for domain selection
 info = yf.Ticker(ticker).info or {}
-name     = info.get("longName", ticker)
+company_name = info.get("longName", ticker)
 sector   = info.get("sector")
 industry = info.get("industry")
-domains  = [d for d in (sector, industry) if d]
+domains  = [d for d in (sector, industry) if d] or ["General"]
 
-if domains:
-    domain = st.selectbox("Which domain to explore?", domains)
-    #comps = fetch_competitors_llm(model, name, domain)
-    comps = fetch_competitors_llm(model, name, domain)
-    st.markdown("#### 🔍 Competitors in this domain:")
-    st.write(", ".join(comps))
-    add_to_history("bot", f"Competitors in {domain}: {', '.join(comps)}")
-else:
-    st.info("No sector/industry info available.")
-    comps = []
+# Let user pick domain
+domain_selected = st.selectbox("Which domain would you like to explore?", domains)
 
-# 4) Price chart
-if comps:
-    df = fetch_stock_df([ticker] + comps)
-    st.markdown("#### 📊 Price Chart (6 mo)")
-    # two-column layout
-    col1, col2 = st.columns(2)
-    with col1:
-        fig_main = px.line(df[[ticker]], title=ticker)
-        st.plotly_chart(fig_main, use_container_width=True)
-    with col2:
-        fig_comp = px.line(df.drop(columns=[ticker]), title="Competitors")
-        st.plotly_chart(fig_comp, use_container_width=True)
+# Competitors via LLM
+competitors = fetch_competitors_llm(model, company_name, domain_selected)
 
-# 5) Free-form Q&A
-st.markdown("#### 💬 Chat")
-for role, text in st.session_state.history:
-    if role == "user":
-        st.markdown(f"**You:** {text}")
+# ───────────────────── Layout: Tabs ────────────────────────────
+tab_summary, tab_charts, tab_comp, tab_chat = st.tabs(
+    ["📊 Summary", "📈 Charts", "🤝 Competitors", "💬 Chat"]
+)
+
+# ---------- Summary Tab ----------
+with tab_summary:
+    st.subheader(f"{ticker} Quick Stats")
+    try:
+        hist = yf.Ticker(ticker).history(period="5d")
+        latest = hist["Close"].iloc[-1]
+        pct = (latest - hist["Close"].iloc[-2]) / hist["Close"].iloc[-2] * 100
+    except Exception:
+        latest, pct = float("nan"), float("nan")
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Price", f"${latest:.2f}", f"{pct:+.2f}%")
+    col2.metric("Market Cap", f"${info.get('marketCap', 0)/1e9:.1f} B", "")
+    col3.metric("P/E Ratio", str(info.get("trailingPE", "—")), "")
+
+    st.markdown("##### LLM Stock Summary")
+    st.write(summary)
+
+# ---------- Charts Tab ----------
+with tab_charts:
+    st.subheader("Price Chart (6 months)")
+    try:
+        price_df = fetch_stock_df([ticker] + competitors)
+        col_main, col_comp = st.columns(2)
+        with col_main:
+            fig_main = px.line(price_df[[ticker]], title=ticker)
+            st.plotly_chart(fig_main, use_container_width=True)
+        with col_comp:
+            if competitors:
+                fig_comp = px.line(price_df[competitors], title="Competitors")
+                st.plotly_chart(fig_comp, use_container_width=True)
+            else:
+                st.info("No competitor price data to display.")
+    except Exception as e:
+        st.error(f"Chart error: {e}")
+
+# ---------- Competitors Tab ----------
+with tab_comp:
+    st.subheader(f"Top Competitors in {domain_selected}")
+    if competitors:
+        cols = st.columns(len(competitors))
+        for c, sym in zip(cols, competitors):
+            try:
+                data = yf.download(sym, period="1mo", progress=False)["Close"]
+                c.metric(
+                    sym,
+                    f"${data.iloc[-1]:.2f}",
+                    f"{(data.pct_change().iloc[-1]*100):+.2f}%",
+                )
+                spark = px.line(data, height=80, width=150)
+                c.plotly_chart(
+                    spark,
+                    use_container_width=True,
+                    config={"displayModeBar": False},
+                )
+            except Exception:
+                c.metric(sym, "—", "—")
     else:
-        st.markdown(f"**Bot:** {text}")
+        st.info("No competitors returned by the model.")
 
-user_q = st.text_area("Your question", "")
-if st.button("Ask"):
-    add_to_history("user", user_q)
-    system = "You are a financial analyst assistant. Use the summary to answer."
-    user_msg = f"Summary: {summary}\nCompetitors: {comps}\n\nQuestion: {user_q}"
-    with st.spinner("Thinking…"):
-        ans = ask_openai(model, system, user_msg)
-    add_to_history("bot", ans)
-    st.experimental_rerun()
+# ---------- Chat Tab ----------
+with tab_chat:
+    # Display the conversation
+    for role, msg in st.session_state.history:
+        st.chat_message(role).write(msg)
+
+    # Chat input
+    user_prompt = st.chat_input("Ask a question…")
+    if user_prompt:
+        add_to_history("user", user_prompt)
+
+        system_prompt = "You are a financial analyst assistant. Use the context below."
+        context = (
+            f"Summary: {summary}\n"
+            f"Competitors: {', '.join(competitors)}\n"
+            f"Domain: {domain_selected}\n"
+        )
+        with st.spinner("Thinking…"):
+            answer = ask_openai(model, system_prompt, context + "\n\n" + user_prompt)
+        add_to_history("assistant", answer)
+        st.experimental_rerun()  # refresh chat tab
