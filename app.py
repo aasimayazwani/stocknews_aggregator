@@ -166,9 +166,18 @@ tab_compare, tab_strategy, tab_chat = st.tabs(["📈 Compare", "🎯 Strategy", 
 # 1) Compare tab
 with tab_compare:
     st.subheader("Price Comparison")
+    #comps_selected = st.multiselect("Select symbols to plot",
+    #                                options=basket + competitors_all,
+    #                                default=basket)
+    show_benchmark = st.checkbox("📊 Compare to S&P 500 (SPY)", value=True)
+
     comps_selected = st.multiselect("Select symbols to plot",
                                     options=basket + competitors_all,
                                     default=basket)
+
+    # Add SPY unless already selected or explicitly unchecked
+    if show_benchmark and "SPY" not in comps_selected:
+        comps_selected.append("SPY")
     duration = st.selectbox("Duration", ["1mo", "3mo", "6mo", "1y"], 2)
     price_df = fetch_stock_df(comps_selected, duration)
     if price_df.empty:
