@@ -63,47 +63,45 @@ def clean_llm_markdown(md: str) -> str:
     md = md.replace("*", "").replace("_", "")        # strip * and _
     return md
 
-# ───────────────────────── KPI helpers ─────────────────────────
-def quarters_sparkline(tkr: str, kpi: str = "revenue") -> go.Figure:
-    """
-    Tiny line chart for the last 8 quarters of Revenue or Net-Income.
-    kpi ∈ {"revenue", "earnings"}
-    """
+def quarters_sparkline(tk, metric: str):
+    """Return sparkline for revenue, EPS, or net income."""
+    import plotly.graph_objects as go
 
-    tk = yf.Ticker(tkr)
-
-    # ---------- 1. pull the right financial dataframe ----------
+    # Try to use quarterly_earnings; fallback to income_stmt
     df = None
+    try:
+        df = tk.quarterly_earnings
+    except Exception:
+        pass
 
-    # yfinance ≥ 0.2.33 exposes .quarterly_income_stmt  (preferred)
-    if hasattr(tk, "quarterly_income_stmt"):
-        df = tk.quarterly_income_stmt
-    # legacy fallback
     if df is None or not isinstance(df, pd.DataFrame) or df.empty:
-        df = getattr(tk, "income_stmt", None)  # annual
-    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
-        return go.Figure()  # give up gracefully
+        try:
+            income_stmt = tk.income_stmt
+            if isinstance(income_stmt, pd.DataFrame):
+                if metric == "revenue" and "Total Revenue" in income_stmt.index:
+                    df = income_stmt.loc["Total Revenue"].to_frame().reset_index()
+                    df.columns = ["Quarter", "Value"]
+                elif metric in ["eps", "earnings"] and "Net Income" in income_stmt.index:
+                    df = income_stmt.loc["Net Income"].to_frame().reset_index()
+                    df.columns = ["Quarter", "Value"]
+        except Exception:
+            df = pd.DataFrame()
 
-    # ---------- 2. map KPI ----------
-    col_map = {
-        "revenue": ["Total Revenue", "Revenue"],
-        "earnings": ["Net Income", "Earnings"]
-    }
-    possible_rows = col_map.get(kpi.lower(), [])
-    sel_row = next((r for r in possible_rows if r in df.index), None)
-    if sel_row is None:
-        return go.Figure()  # row not found
+    if df is None or df.empty:
+        return go.Figure()
 
-    ser = df.loc[sel_row].tail(8)  # last 8 quarters / years
-    ser.index = ser.index.astype(str)
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=df["Quarter"], y=df["Value"],
+        mode="lines+markers",
+        line=dict(color="skyblue")
+    ))
 
-    # ---------- 3. make sparkline ----------
-    fig = px.line(ser, height=110)
     fig.update_layout(
-        showlegend=False,
-        margin=dict(l=0, r=0, t=0, b=0),
-        xaxis=dict(showticklabels=False),
-        yaxis=dict(showticklabels=False),
+        height=160,
+        margin=dict(t=10, l=10, r=10, b=10),
+        xaxis_title=None,
+        yaxis_title="Value",
     )
     return fig
 
