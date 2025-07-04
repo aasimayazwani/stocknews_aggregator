@@ -79,36 +79,40 @@ with st.sidebar.expander("⚙️ Settings", expanded=False):
         st.session_state.history = []
     if st.button("🛑 Clear Tickers"):
         st.session_state.tickers_selected = []
-
+tickers = st.session_state.tickers_selected
 # ───────────────────────── Ticker search UI ──────────────────────
-st.markdown("### 🔍 Add tickers")
-search_q = st.text_input("Type company / ticker name (min 2 chars)", "", key="search_box")
+with st.container():
+    st.markdown("### 📌 Stock Selection", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([3, 2, 2])
 
+    with col1:
+        search_q = st.text_input("Search company or ticker", "", key="search_box")
+
+    with col2:
+        primary = st.selectbox("Primary ticker", options=tickers, index=0, key="primary_select")
+
+    with col3:
+        domain_selected = st.selectbox("Domain", domains)
+
+# Autocomplete below
 if len(search_q) >= 2:
     matches = search_ticker_symbols(search_q)
     if not matches:
         st.info("No matches yet… keep typing")
     else:
-        # existing selectbox code
-        matches = search_ticker_symbols(search_q)
-        if matches:
-            display_opts = [f"{m['name']}  ({m['symbol']})" for m in matches]
-            choice = st.selectbox("Suggestions", display_opts, index=0, key="suggest_box")
-            #if st.button("➕ Add to basket", key="add_btn"):
-            #    chosen_sym = choice.split("(")[-1].rstrip(")")
-            #    if chosen_sym not in st.session_state.tickers_selected:
-            #        st.session_state.tickers_selected.append(chosen_sym)
-            #        st.success(f"Added {chosen_sym}")
-            if st.button("➕ Add to basket", key="add_btn"):
-                chosen_sym = choice.split("(")[-1].rstrip(")")
-                default_seed = {"AAPL", "MSFT"}
-                if set(st.session_state.tickers_selected) == default_seed:
-                    st.session_state.tickers_selected = []  # clear default demo list
+        display_opts = [f"{m['name']}  ({m['symbol']})" for m in matches]
+        choice = st.selectbox("Suggestions", display_opts, index=0, key="suggest_box")
 
-                if chosen_sym not in st.session_state.tickers_selected:
-                    st.session_state.tickers_selected.insert(0, chosen_sym)  # insert at top
-                #st.experimental_rerun()
-                st.rerun()
+        if st.button("➕ Add to basket", key="add_btn"):
+            chosen_sym = choice.split("(")[-1].rstrip(")")
+            default_seed = {"AAPL", "MSFT"}
+            if set(st.session_state.tickers_selected) == default_seed:
+                st.session_state.tickers_selected = []  # clear default demo list
+
+            if chosen_sym not in st.session_state.tickers_selected:
+                st.session_state.tickers_selected.insert(0, chosen_sym)  # insert at top
+            st.rerun()
+
 # Manual fallback (keeps parity with old flow)
 #manual_raw = st.text_input("Or paste comma-separated symbols", "")
 #if manual_raw:
@@ -145,10 +149,19 @@ except Exception:
     last_px = pct_px = float("nan")
 
 with st.sidebar:
-    st.markdown("### ℹ️ Snapshot")
-    st.metric("Price", f"${last_px:.2f}", f"{pct_px:+.2f}%")
-    st.metric("Market Cap", f"${info.get('marketCap',0)/1e9:.1f} B")
-    st.metric("P/E", str(info.get("trailingPE", "—")))
+    st.markdown("### 🧾 Snapshot", unsafe_allow_html=True)
+
+    st.markdown(f"""
+    <div style='text-align: center; font-size: 30px; font-weight: bold; color: white;'>
+        ${last_px:.2f}
+    </div>
+    <div style='text-align: center; font-size: 16px; color: {"green" if pct_px >= 0 else "red"};'>
+        {pct_px:+.2f}%
+    </div>
+    <hr style='margin:10px 0; border:1px solid #333;'/>
+    <div style='font-size: 13px;'>Market Cap: <b>${info.get('marketCap', 0)/1e9:.2f} B</b></div>
+    <div style='font-size: 13px;'>P/E Ratio: <b>{info.get('trailingPE', '—')}</b></div>
+    """, unsafe_allow_html=True)
 
 # ───────────────────────── Domain & competitor logic ─────────────
 domains = [d for d in (sector, industry) if d] or ["General"]
@@ -189,17 +202,26 @@ with tab_compare:
                     labels={"value": "Price", "variable": "Ticker"}),
             use_container_width=True
         )
-        st.markdown("### Latest Prices")
+        st.markdown("### 💹 Latest Prices", unsafe_allow_html=True)
         cols = st.columns(len(price_df.columns))
+
         for c, sym in zip(cols, price_df.columns):
-            ser, last = price_df[sym], price_df[sym].iloc[-1]
+            ser = price_df[sym]
+            last = ser.iloc[-1]
             delta = ser.pct_change().iloc[-1] * 100
-            spark = px.line(ser, height=80).update_layout(
-                showlegend=False, margin=dict(l=0,r=0,t=0,b=0),
-                xaxis=dict(showticklabels=False), yaxis=dict(showticklabels=False)
-            )
-            c.plotly_chart(spark, use_container_width=True)
-            c.metric(sym, f"${last:.2f}", f"{delta:+.2f}%")
+
+            with c:
+                st.plotly_chart(px.line(ser, height=80)
+                    .update_layout(showlegend=False, margin=dict(l=0,r=0,t=0,b=0),
+                                xaxis=dict(showticklabels=False), yaxis=dict(showticklabels=False)),
+                    use_container_width=True
+                )
+                st.markdown(f"""
+                <div style='font-size: 20px; font-weight: bold;'>{sym}</div>
+                <div style='font-size: 18px;'>${last:.2f}</div>
+                <div style='color: {"green" if delta >= 0 else "red"};'>{delta:+.2f}%</div>
+                """, unsafe_allow_html=True)
+
 
 # 2) Strategy tab
 with tab_strategy:
