@@ -1,6 +1,7 @@
+# .streamlit/config.toml
 [theme]
-primaryColor="#14b8a6"
-backgroundColor="#0d1117"
-secondaryBackgroundColor="#161b22"
-textColor="#f1f5f9"
+primaryColor="#34D399"          # Emerald Slate
+backgroundColor="#111827"
+secondaryBackgroundColor="#1F2937"
+textColor="#E5E7EB"
 font="sans serif"
