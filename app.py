@@ -101,12 +101,12 @@ if len(search_q) >= 2:
                     st.success(f"Added {chosen_sym}")
 
 # Manual fallback (keeps parity with old flow)
-manual_raw = st.text_input("Or paste comma-separated symbols", "")
-if manual_raw:
-    for t in manual_raw.split(","):
-        sym = t.strip().upper()
-        if sym and sym not in st.session_state.tickers_selected:
-            st.session_state.tickers_selected.append(sym)
+#manual_raw = st.text_input("Or paste comma-separated symbols", "")
+#if manual_raw:
+##    for t in manual_raw.split(","):
+#       sym = t.strip().upper()
+#        if sym and sym not in st.session_state.tickers_selected:
+#            st.session_state.tickers_selected.append(sym)
 
 tickers = st.session_state.tickers_selected
 if not tickers:
