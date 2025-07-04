@@ -21,25 +21,33 @@ def add_to_history(role, txt):
     st.session_state.history.append((role, txt))
 
 # ───────────────────────── Yahoo search helper ───────────────────
-@st.cache_data(ttl=3600)
+# ───────────────────────── Yahoo search helper ───────────────────
+@st.cache_data(ttl=3600, show_spinner=False)
 def search_ticker_symbols(query: str, limit: int = 10):
-    """Return [{'symbol': 'AAPL', 'name': 'Apple Inc.'}, …] for a search query."""
+    """Return [{'symbol': 'AAPL', 'name': 'Apple Inc.'}, …] for ‘query’."""
     url = "https://query2.finance.yahoo.com/v1/finance/search"
+    params = {"q": query, "quotesCount": limit, "newsCount": 0, "lang": "en"}
+
     try:
-        resp = requests.get(url, params={"q": query, "quotesCount": limit,
-                                         "newsCount": 0, "lang": "en"}, timeout=4)
+        resp = requests.get(
+            url,
+            params=params,
+            headers={"User-Agent": "Mozilla/5.0"},   # ←▸ important
+            timeout=4,
+        )
         resp.raise_for_status()
-        data = resp.json().get("quotes", [])
-        out = []
-        for d in data:
-            sym = d.get("symbol", "").upper()
-            name = d.get("shortname") or d.get("longname") or ""
-            if sym and name:
-                out.append({"symbol": sym, "name": name})
-        return out
+        quotes = resp.json().get("quotes", [])
     except Exception:
+        # propagate “no matches” rather than cache a failure
         return []
 
+    results = []
+    for q in quotes:
+        sym  = q.get("symbol", "").upper()
+        name = q.get("shortname") or q.get("longname") or ""
+        if sym and name:
+            results.append({"symbol": sym, "name": name})
+    return results
 # ───────────────────────── Cached helpers ────────────────────────
 @st.cache_data(ttl=300)
 def fetch_stock_df(tickers, period):
@@ -78,14 +86,19 @@ search_q = st.text_input("Type company / ticker name (min 2 chars)", "", key="se
 
 if len(search_q) >= 2:
     matches = search_ticker_symbols(search_q)
-    if matches:
-        display_opts = [f"{m['name']}  ({m['symbol']})" for m in matches]
-        choice = st.selectbox("Suggestions", display_opts, index=0, key="suggest_box")
-        if st.button("➕ Add to basket", key="add_btn"):
-            chosen_sym = choice.split("(")[-1].rstrip(")")
-            if chosen_sym not in st.session_state.tickers_selected:
-                st.session_state.tickers_selected.append(chosen_sym)
-                st.success(f"Added {chosen_sym}")
+    if not matches:
+        st.info("No matches yet… keep typing")
+    else:
+        # existing selectbox code
+        matches = search_ticker_symbols(search_q)
+        if matches:
+            display_opts = [f"{m['name']}  ({m['symbol']})" for m in matches]
+            choice = st.selectbox("Suggestions", display_opts, index=0, key="suggest_box")
+            if st.button("➕ Add to basket", key="add_btn"):
+                chosen_sym = choice.split("(")[-1].rstrip(")")
+                if chosen_sym not in st.session_state.tickers_selected:
+                    st.session_state.tickers_selected.append(chosen_sym)
+                    st.success(f"Added {chosen_sym}")
 
 # Manual fallback (keeps parity with old flow)
 manual_raw = st.text_input("Or paste comma-separated symbols", "")
