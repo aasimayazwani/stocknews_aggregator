@@ -28,6 +28,23 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+st.markdown("""
+<style>
+.metric-tile {
+  background:#f1f5f90D;  /* translucent */
+  border:1px solid #33415550;
+  padding:18px 22px;
+  border-radius:12px;
+  transition:background 0.2s;
+  cursor:pointer;
+}
+.metric-tile:hover { background:#33415522; }
+.metric-title  { font-weight:600; font-size:18px; margin-bottom:6px; }
+.metric-value  { font-size:22px; font-weight:700; }
+.chevron { float:right; font-size:20px; line-height:18px; transform:translateY(2px); }
+</style>
+""", unsafe_allow_html=True)
+
 st.title("📈 Market Movement Chatbot")
 
 # ───────────────────────── Session state ─────────────────────────
@@ -480,49 +497,65 @@ with tab_outlook:
         return f"{(model_val - street_val) / street_val * 100:+.1f}% vs Street"
 
     # ─── key-numbers block ───────────────────────────────────────────
-    st.markdown("#### 📈 Key Numbers")
-    cols = st.columns(2)
+    # ───  Key-number interactive tiles  ────────────────────────────────
+    tiles = st.columns(2)
 
-    cols[0].metric(
-        "EPS (Model)",
-        f"${eps_model:,.2f}",
-        delta=pct_delta(eps_model, eps_street),
-    )
+    kpi_data = [
+        {
+            "name": "EPS",
+            "model_val": eps_model,
+            "street_val": eps_street,
+            "prob": prob_eps,
+            "spark": quarters_sparkline(primary, "earnings"),
+            "reason": " ".join(outlook_md_clean.split("•")[1].splitlines())  # crude extract
+        },
+        {
+            "name": "Total Revenue",
+            "model_val": rev_model,
+            "street_val": rev_street,
+            "prob": None,
+            "spark": quarters_sparkline(primary, "revenue"),
+            "reason": " ".join(outlook_md_clean.split("•")[2].splitlines())
+        }
+    ]
 
-    cols[1].metric(
-        "Revenue (Model)",
-        f"${rev_model:,.1f} B",
-        delta=pct_delta(rev_model, rev_street),
-    )
+    for idx, kpi in enumerate(kpi_data):
+        col = tiles[idx % 2]        # wrap after 2 if you add more KPIs
+        key = f"show_{kpi['name']}"
+        if key not in st.session_state:
+            st.session_state[key] = False
 
-    # 3.5  Comparison bar charts (unchanged)
-    st.plotly_chart(kpi_bar(eps_street, eps_model, "EPS"), use_container_width=True)
-    st.plotly_chart(kpi_bar(rev_street, rev_model, "Revenue (B)"), use_container_width=True)
-
-    # 3.6  Probability gauge
-    if prob_eps is not None:
-        fig = go.Figure(
-            go.Indicator(
-                mode="gauge+number",
-                value=prob_eps,
-                title={"text": "EPS Beat Probability"},
-                gauge={"axis": {"range": [0, 100]}}
+        # --- summary tile ---
+        with col:
+            clicked = st.button(
+                label=f"""<div class='metric-tile'>
+                            <span class='metric-title'>{kpi['name']}</span>
+                            <span class='metric-value'>${kpi['model_val']:,.2f}</span>
+                            <span class='chevron'>{'▼' if st.session_state[key] else '▶'}</span>
+                        </div>""",
+                key=f"tile_{kpi['name']}",
+                help="Click to expand",
+                use_container_width=True,
+                unsafe_allow_html=True,
             )
-        )
-        st.plotly_chart(fig, use_container_width=True)
+            if clicked:
+                st.session_state[key] = not st.session_state[key]
 
-    # 3.7  Historical sparklines
-    st.markdown("#### 🕒 8-Q Trend")
-    spark_cols = st.columns(2)
-
-    spark_cols[0].plotly_chart(
-        quarters_sparkline(primary, "revenue"), use_container_width=True
-    )
-    spark_cols[0].caption("Revenue history")
-
-    spark_cols[1].plotly_chart(
-        quarters_sparkline(primary, "earnings"), use_container_width=True
-    )
-    spark_cols[1].caption("Net-income history")
-
-
+        # --- details panel ---
+        if st.session_state[key]:
+            with st.container():
+                st.markdown("<div class='card'>", unsafe_allow_html=True)
+                st.markdown(f"**Street consensus:** ${kpi['street_val']:,.2f}  \n"
+                            f"**Δ vs Street:** {pct_delta(kpi['model_val'], kpi['street_val'])}")
+                st.plotly_chart(kpi["spark"], use_container_width=True)
+                if kpi["prob"] is not None:
+                    st.plotly_chart(
+                        go.Figure(go.Indicator(
+                            mode="gauge+number",
+                            value=kpi["prob"],
+                            gauge={"axis":{"range":[0,100]}}
+                        )),
+                        use_container_width=True
+                    )
+                st.write(kpi["reason"])
+                st.markdown("</div>", unsafe_allow_html=True)
