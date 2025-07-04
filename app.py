@@ -161,7 +161,7 @@ else:
     basket = tickers
 
 # ───────────────────────── Tabs ──────────────────────────────────
-tab_compare, tab_strategy, tab_chat = st.tabs(["📈 Compare", "🎯 Strategy", "💬 Chat"])
+tab_compare, tab_strategy, tab_chat, tab_outlook = st.tabs(["📈 Compare", "🎯 Strategy", "💬 Chat", "🔮 Quarterly Outlook"])
 
 # 1) Compare tab
 with tab_compare:
@@ -244,3 +244,26 @@ with tab_chat:
         ans = ask_openai(model, "You are a helpful market analyst.", ctx + "\n\n" + q)
         add_to_history("assistant", ans)
         st.experimental_rerun()
+
+with tab_outlook:
+    st.subheader("🔮 Quarterly Outlook: Consensus Intelligence")
+
+    with st.spinner("Analyzing forecast sentiment…"):
+        outlook_prompt = (
+            f"For the company {primary}, identify the most commonly tracked quarterly metrics "
+            f"based on its business model (e.g., sales volume, EPS, EBITDA, customer growth, etc.). "
+            f"Then use public signals, analyst expectations, and industry trends to infer whether each "
+            f"metric is likely to beat, meet, or miss expectations in the upcoming quarter. "
+            f"Also mention the likelihood of dividend increases, product launches, regulatory events, "
+            f"or revenue segment performance if applicable. Present this as a forecast summary "
+            f"including 3–5 predictions with reasoning."
+        )
+
+        outlook = ask_openai(
+            model,
+            "You are a seasoned financial analyst with access to consensus research and market data.",
+            outlook_prompt
+        )
+    st.markdown("### 📌 Forecast Summary")
+    st.write(outlook)
+
