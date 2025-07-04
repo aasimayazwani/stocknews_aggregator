@@ -2,6 +2,7 @@
 import streamlit as st
 import requests, yfinance as yf
 import pandas as pd
+import textwrap
 import re
 import plotly.express as px
 import math
@@ -39,10 +40,10 @@ def add_to_history(role, txt):
     st.session_state.history.append((role, txt))
 
 def clean_llm_markdown(md: str) -> str:
-    # Fix common bold/italic issues caused by missing spaces or asterisks
-    md = re.sub(r"(\d)(?=[a-zA-Z])", r"\1 ", md)  # e.g., "1.35reflects" → "1.35 reflects"
-    md = re.sub(r"([a-zA-Z])(?=\d)", r"\1 ", md)  # e.g., "at1.28" → "at 1.28"
-    md = md.replace("*", "")  # optional: strip all asterisks if broken too often
+    """Remove stray markdown emphasis and join-up words."""
+    md = re.sub(r"(\d)(?=[a-zA-Z])", r"\1 ", md)     # 1.35reflects → 1.35 reflects
+    md = re.sub(r"([a-zA-Z])(?=\d)", r"\1 ", md)     # at1.28       → at 1.28
+    md = md.replace("*", "").replace("_", "")        # strip * and _
     return md
 
 # ───────────────────────── KPI helpers ─────────────────────────
@@ -442,12 +443,14 @@ with tab_outlook:
     #st.markdown("</div>", unsafe_allow_html=True)
     outlook_md_clean = clean_llm_markdown(outlook_md)
 
-    # Wrap in a styled card and display clean markdown as HTML
-    st.markdown(f"""
-    <div class='card'>
-    {outlook_md_clean}
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        textwrap.dedent(f"""
+        <div class='card'>
+        {outlook_md_clean}
+        </div>
+        """),
+        unsafe_allow_html=True
+    )
 
     # 3.3  Parse the numbers out of the LLM text
     def grab_num(pattern, text):
@@ -461,12 +464,13 @@ with tab_outlook:
         if suffix_match and suffix_match.group(1).upper() == "M":
             val /= 1_000  # convert millions → billions
         return val
-
-    eps_model   = grab_num(r"EPS.*?\$?([\d\.]+)", outlook_md)
-    rev_model   = grab_num(r"Revenue.*?\$?([\d\.]+)", outlook_md)
-    eps_street  = grab_num(r"Street.*EPS.*?\$?([\d\.]+)", outlook_md)
-    rev_street  = grab_num(r"Street.*Revenue.*?\$?([\d\.]+)", outlook_md)
-    prob_match  = re.search(r"Probability.*?(\d{1,3}) ?%", outlook_md, re.I)
+    outlook_md_clean
+        # 3.3  Parse numbers FROM THE CLEAN STRING
+    eps_model   = grab_num(r"EPS.*?\\$?([\\d\\.]+)", outlook_md_clean)
+    rev_model   = grab_num(r"Revenue.*?\\$?([\\d\\.]+)", outlook_md_clean)
+    eps_street  = grab_num(r"Street.*EPS.*?\\$?([\\d\\.]+)", outlook_md_clean)
+    rev_street  = grab_num(r"Street.*Revenue.*?\\$?([\\d\\.]+)", outlook_md_clean)
+    prob_match  = re.search(r"Probability.*?(\\d{{1,3}}) ?%", outlook_md_clean, re.I)
     prob_eps    = int(prob_match.group(1)) if prob_match else None
 
         # helper right above this block (or put it with your helpers section)
