@@ -91,8 +91,8 @@ with st.container():
     with col2:
         primary = st.selectbox("Primary ticker", options=tickers, index=0, key="primary_select")
 
-    with col3:
-        domain_selected = st.selectbox("Domain", domains)
+    #with col3:
+    #    domain_selected = st.selectbox("Domain", domains)
 
 # Autocomplete below
 if len(search_q) >= 2:
