@@ -481,7 +481,7 @@ with tab_outlook:
         if suffix_match and suffix_match.group(1).upper() == "M":
             val /= 1_000  # convert millions → billions
         return val
-    outlook_md_clean
+
         # 3.3  Parse numbers FROM THE CLEAN STRING
     eps_model   = grab_num(r"EPS.*?\\$?([\\d\\.]+)", outlook_md_clean)
     rev_model   = grab_num(r"Revenue.*?\\$?([\\d\\.]+)", outlook_md_clean)
@@ -491,50 +491,40 @@ with tab_outlook:
     prob_eps    = int(prob_match.group(1)) if prob_match else None
 
         # helper right above this block (or put it with your helpers section)
+        # ── helper already defined just above ──────────────────────────
+    
     def pct_delta(model_val, street_val):
         if np.isnan(model_val) or np.isnan(street_val) or street_val == 0:
             return ""
         return f"{(model_val - street_val) / street_val * 100:+.1f}% vs Street"
 
-    # ─── key-numbers block ───────────────────────────────────────────
-    # ───  Key-number interactive tiles  ────────────────────────────────
-    # ─── key-numbers block ───────────────────────────────────────────
-# ───  Key-number interactive tiles  ────────────────────────────────
-        # ─── KPI interactive tiles (EPS & Revenue) ─────────────────────
-    # 1) grab bullet-point reasons safely
+    # ── KPI interactive tiles (EPS & Revenue) ──────────────────────
     bullets = re.findall(r"•\s*(.+)", outlook_md_clean)
-    while len(bullets) < 2:          # never IndexError
+    while len(bullets) < 2:              # avoid IndexError
         bullets.append("Reason not found.")
 
-    # 2) define data for each KPI
     kpis = [
-        dict(
-            name="EPS",
-            model=eps_model,
-            street=eps_street,
-            prob=prob_eps,
-            spark_key="earnings",
-            reason=bullets[0],
-        ),
-        dict(
-            name="Revenue",
-            model=rev_model,
-            street=rev_street,
-            prob=None,                # no probability parsed for revenue
-            spark_key="revenue",
-            reason=bullets[1],
-        ),
+        dict(name="EPS",
+             model=eps_model,
+             street=eps_street,
+             prob=prob_eps,
+             spark_key="earnings",
+             reason=bullets[0]),
+        dict(name="Revenue",
+             model=rev_model,
+             street=rev_street,
+             prob=None,
+             spark_key="revenue",
+             reason=bullets[1]),
     ]
 
-    tiles = st.columns(2)            # two tiles per row
-
+    tiles = st.columns(2)                # two tiles per row
     for idx, k in enumerate(kpis):
         col        = tiles[idx % 2]
         state_key  = f"show_{k['name']}"
         if state_key not in st.session_state:
             st.session_state[state_key] = False
 
-        # ── summary tile ───────────────────────────────────────────
         tile_html = f"""
         <div class='metric-tile'>
             <span class='metric-title'>{k['name']}</span>
@@ -548,7 +538,6 @@ with tab_outlook:
                       unsafe_allow_html=True):
             st.session_state[state_key] = not st.session_state[state_key]
 
-        # ── details panel ──────────────────────────────────────────
         if st.session_state[state_key]:
             with st.container():
                 st.markdown("<div class='card'>", unsafe_allow_html=True)
@@ -558,7 +547,7 @@ with tab_outlook:
                 )
                 st.plotly_chart(
                     quarters_sparkline(primary, k['spark_key']),
-                    use_container_width=True
+                    use_container_width=True,
                 )
                 if k['prob'] is not None:
                     st.plotly_chart(
@@ -571,3 +560,6 @@ with tab_outlook:
                     )
                 st.write(k['reason'])
                 st.markdown("</div>", unsafe_allow_html=True)
+
+    # ───────────────────────── 8-Q Trend (leave as-is) ─────────────
+    st.markdown("#### 🕒 8-Q Trend")
