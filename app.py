@@ -107,7 +107,8 @@ if len(search_q) >= 2:
 
                 if chosen_sym not in st.session_state.tickers_selected:
                     st.session_state.tickers_selected.insert(0, chosen_sym)  # insert at top
-                st.experimental_rerun()
+                #st.experimental_rerun()
+                st.rerun()
 # Manual fallback (keeps parity with old flow)
 #manual_raw = st.text_input("Or paste comma-separated symbols", "")
 #if manual_raw:
@@ -243,7 +244,8 @@ with tab_chat:
         ctx = f"Summary: {summary}\nDomain: {domain_selected}\nTickers: {', '.join(basket)}"
         ans = ask_openai(model, "You are a helpful market analyst.", ctx + "\n\n" + q)
         add_to_history("assistant", ans)
-        st.experimental_rerun()
+        #st.experimental_rerun()
+        st.rerun()
 
 with tab_outlook:
     st.subheader("🔮 Quarterly Outlook: Consensus Intelligence")
