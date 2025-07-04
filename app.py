@@ -127,12 +127,12 @@ if not tickers:
     st.stop()
 
 #primary = tickers[0]  # first drives snapshot & sector
-primary = st.selectbox(
-    "Reference ticker (drives snapshot & peers)",
-    options=tickers,
-    index=0,
-    key="primary_select",
-)
+#primary = st.selectbox(
+#    "Reference ticker (drives snapshot & peers)",
+#    options=tickers,
+#    index=0,
+#    key="primary_select",
+#)
 
 # ───────────────────────── Snapshot & metadata ───────────────────
 summary = get_stock_summary(primary); add_to_history("bot", summary)
