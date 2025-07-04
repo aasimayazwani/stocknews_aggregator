@@ -7,6 +7,7 @@ import plotly.express as px
 import math
 from typing import Dict
 import plotly.graph_objects as go   # for the confidence gauge
+import numpy as np
 
 
 from config import DEFAULT_MODEL
@@ -14,6 +15,18 @@ from stock_utils import get_stock_summary
 from openai_client import ask_openai
 
 st.set_page_config(page_title="Market Movement Chatbot", layout="wide")
+# 👉 Drop the style block right here
+st.markdown("""
+<style>
+.card{
+  background:#1e1f24;
+  padding:18px;
+  border-radius:12px;
+  margin-bottom:18px;
+}
+</style>
+""", unsafe_allow_html=True)
+
 st.title("📈 Market Movement Chatbot")
 
 # ───────────────────────── Session state ─────────────────────────
@@ -24,6 +37,46 @@ if "tickers_selected" not in st.session_state:
 
 def add_to_history(role, txt):
     st.session_state.history.append((role, txt))
+
+# ───────────────────────── KPI helpers ─────────────────────────
+def quarters_sparkline(tkr: str, kpi: str = "revenue") -> go.Figure:
+    """
+    Return a tiny line chart of the last 8 quarters of revenue or EPS.
+    kpi ∈ {"revenue", "eps"}
+    """
+    hist = yf.Ticker(tkr).earnings
+    if hist.empty:
+        return go.Figure()
+    # yfinance returns FY data; we fake quarters by rolling mean if quarterly not present
+    if len(hist) < 8:
+        ser = hist.iloc[-8:][kpi.title()]
+    else:
+        ser = hist[kpi.title()].tail(8)
+    fig = px.line(ser, height=110)
+    fig.update_layout(
+        showlegend=False, margin=dict(l=0, r=0, t=0, b=0),
+        xaxis=dict(showticklabels=False), yaxis=dict(showticklabels=False),
+    )
+    return fig
+
+
+def kpi_bar(street: float, model: float, label: str) -> go.Figure:
+    """Horizontal bar showing Street vs Model for one KPI."""
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        y=[label], x=[street], name="Street", orientation="h",
+        marker=dict(color="#334155")
+    ))
+    fig.add_trace(go.Bar(
+        y=[label], x=[model], name="Model", orientation="h",
+        marker=dict(color="#6366f1")
+    ))
+    fig.update_layout(
+        barmode="group", height=140, margin=dict(l=60, r=20, t=10, b=10),
+        showlegend=False, xaxis=dict(title="")
+    )
+    return fig
+
 
 # ───────────────────────── Earnings helpers ──────────────────────────
 def get_consensus_estimates(ticker: str) -> Dict[str, float]:
@@ -335,65 +388,74 @@ with tab_chat:
         st.rerun()
 
 # ───────────────────────── Tab 4: Quarterly Outlook ─────────────────────────
+# ───────────────────────── Tab 4: Quarterly Outlook ─────────────────────────
 with tab_outlook:
     st.subheader("🔮 Quarterly Outlook: Consensus Intelligence")
 
-    # 3.1  Build a richer prompt that asks for numeric predictions + probability + source
+    # 3.1  LLM prompt with numbers + prob
     outlook_prompt = (
-        f"For {primary}, list the **two most-watched KPIs** (EPS and Total Revenue) "
-        f"for the upcoming quarter. For EACH KPI output:\n"
-        f"• Your numeric forecast (in same units analysts quote)\n"
-        f"• A qualitative label (Beat / Meet / Miss) **and** probability (0-100 %)\n"
-        f"• 1–2 sentence reasoning that ends with “Source: <title>, <publisher>, <date>”\n\n"
-        f"Then summarize one upside and one downside swing factor."
+        f"Provide numeric forecasts for **EPS** and **Total Revenue** for {primary}'s next quarter. "
+        f"For each KPI include: your prediction, Street consensus, and beat probability in %. "
+        f"Add one sentence of reasoning ending with 'Source: …'. "
+        f"Return in markdown: a table plus bullets, no code fences."
     )
 
-    with st.spinner("Analyzing forecast sentiment…"):
+    with st.spinner("⏳ Generating outlook…"):
         outlook_md = ask_openai(
             model,
-            "You are a seasoned sell-side analyst who must cite every claim.",
+            "You are a senior equity analyst, precise and data-driven.",
             outlook_prompt,
         )
 
-    # 3.2  Show the raw LLM card
-    st.markdown("### 📌 Forecast Summary")
+    # 3.2  Show the raw LLM text in a card
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
     st.write(outlook_md)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    # 3.3  Compute Street vs Model deltas for EPS & Revenue
-    street = get_consensus_estimates(primary)
-    preds  = extract_model_preds(outlook_md)
+    # 3.3  Parse the numbers out of the LLM text
+    def grab_num(pattern, text):
+        m = re.search(pattern, text, re.I)
+        return float(m.group(1).replace(",", "")) if m else np.nan
 
-    delta_rows = []
-    for kpi in ["Revenue", "EPS"]:
-        st_val   = street.get(kpi, math.nan)
-        mdl_val  = preds.get(kpi,  math.nan)
-        if math.isnan(st_val) or math.isnan(mdl_val):   # skip if missing
-            continue
-        delta_pct = (mdl_val - st_val) / st_val * 100
-        delta_rows.append(
-            f"| **{kpi}** | {st_val:,.2f} | {mdl_val:,.2f} | {delta_pct:+.1f}% |"
-        )
+    eps_model   = grab_num(r"EPS.*?\$?([\d\.]+)", outlook_md)
+    rev_model   = grab_num(r"Revenue.*?\$?([\d\.]+)", outlook_md)
+    eps_street  = grab_num(r"Street.*EPS.*?\$?([\d\.]+)", outlook_md)
+    rev_street  = grab_num(r"Street.*Revenue.*?\$?([\d\.]+)", outlook_md)
+    prob_match  = re.search(r"Probability.*?(\d{1,3}) ?%", outlook_md, re.I)
+    prob_eps    = int(prob_match.group(1)) if prob_match else None
 
-    if delta_rows:
-        st.markdown("#### Street vs Model")
-        st.markdown(
-            "\n".join(
-                ["| KPI | Street | Model | Δ |",
-                 "|-----|--------|-------|---|"] + delta_rows
-            )
-        )
+    # 3.4  Metric cards (Model vs Street)
+    st.markdown("#### 📈 Key Numbers")
+    cols = st.columns(2)
+    cols[0].metric("EPS (Model)",   f"${eps_model:,.2f}",
+                   delta=f"{(eps_model - eps_street)/eps_street*100:+.1f}% vs Street")
+    cols[1].metric("Revenue (Model)", f"${rev_model:,.1f} B",
+                   delta=f"{(rev_model - rev_street)/rev_street*100:+.1f}% vs Street")
 
-    # 3.4  Render a confidence gauge if the LLM supplied one
-    prob_match = re.search(r"Probability.*?(\d{1,3}) ?%", outlook_md, re.I)
-    if prob_match:
-        prob = int(prob_match.group(1))
+    # 3.5  Comparison bar charts
+    st.plotly_chart(kpi_bar(eps_street, eps_model, "EPS"), use_container_width=True)
+    st.plotly_chart(kpi_bar(rev_street, rev_model, "Revenue (B)"), use_container_width=True)
+
+    # 3.6  Probability gauge
+    if prob_eps is not None:
         fig = go.Figure(
             go.Indicator(
                 mode="gauge+number",
-                value=prob,
+                value=prob_eps,
                 title={"text": "EPS Beat Probability"},
                 gauge={"axis": {"range": [0, 100]}}
             )
         )
         st.plotly_chart(fig, use_container_width=True)
+
+    # 3.7  Historical sparklines
+    st.markdown("#### 🕒 8-Q Trend")
+    spark_cols = st.columns(2)
+    spark_cols[0].plotly_chart(quarters_sparkline(primary, "revenue"),
+                               use_container_width=True)
+    spark_cols[0].caption("Revenue history")
+    spark_cols[1].plotly_chart(quarters_sparkline(primary, "eps"),
+                               use_container_width=True)
+    spark_cols[1].caption("EPS history")
+
 
