@@ -41,28 +41,38 @@ def add_to_history(role, txt):
 # ───────────────────────── KPI helpers ─────────────────────────
 def quarters_sparkline(tkr: str, kpi: str = "revenue") -> go.Figure:
     """
-    Tiny line chart for last 8 quarters of Revenue or Earnings.
+    Tiny line chart for the last 8 quarters of Revenue or Net-Income.
     kpi ∈ {"revenue", "earnings"}
     """
+
     tk = yf.Ticker(tkr)
 
-    # yfinance 0.2.x exposes quarterly_earnings; fall back to annual earnings
-    try:
-        df = tk.quarterly_earnings.copy()
-    except AttributeError:
-        df = tk.earnings.copy()
+    # ---------- 1. pull the right financial dataframe ----------
+    df = None
 
-    if not isinstance(df, pd.DataFrame) or df.empty:
-        return go.Figure()
+    # yfinance ≥ 0.2.33 exposes .quarterly_income_stmt  (preferred)
+    if hasattr(tk, "quarterly_income_stmt"):
+        df = tk.quarterly_income_stmt
+    # legacy fallback
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        df = getattr(tk, "income_stmt", None)  # annual
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return go.Figure()  # give up gracefully
 
-    col_map = {"revenue": "Revenue", "earnings": "Earnings"}
-    sel_col = col_map.get(kpi.lower())
-    if sel_col not in df.columns:
-        return go.Figure()
+    # ---------- 2. map KPI ----------
+    col_map = {
+        "revenue": ["Total Revenue", "Revenue"],
+        "earnings": ["Net Income", "Earnings"]
+    }
+    possible_rows = col_map.get(kpi.lower(), [])
+    sel_row = next((r for r in possible_rows if r in df.index), None)
+    if sel_row is None:
+        return go.Figure()  # row not found
 
-    ser = df[sel_col].tail(8)
-    ser.index = ser.index.astype(str)   # nicer x-axis tooltip
+    ser = df.loc[sel_row].tail(8)  # last 8 quarters / years
+    ser.index = ser.index.astype(str)
 
+    # ---------- 3. make sparkline ----------
     fig = px.line(ser, height=110)
     fig.update_layout(
         showlegend=False,
@@ -485,11 +495,15 @@ with tab_outlook:
     # 3.7  Historical sparklines
     st.markdown("#### 🕒 8-Q Trend")
     spark_cols = st.columns(2)
-    spark_cols[0].plotly_chart(quarters_sparkline(primary, "revenue"),
-                                use_container_width=True)
+
+    spark_cols[0].plotly_chart(
+        quarters_sparkline(primary, "revenue"), use_container_width=True
+    )
     spark_cols[0].caption("Revenue history")
-    spark_cols[1].plotly_chart(quarters_sparkline(primary, "eps"),
-                                use_container_width=True)
-    spark_cols[1].caption("EPS history")
+
+    spark_cols[1].plotly_chart(
+        quarters_sparkline(primary, "earnings"), use_container_width=True
+    )
+    spark_cols[1].caption("Net-income history")
 
 
