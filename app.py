@@ -2,6 +2,7 @@
 import streamlit as st
 import requests, yfinance as yf
 import pandas as pd
+import re
 import plotly.express as px
 
 from config import DEFAULT_MODEL
@@ -241,21 +242,43 @@ with tab_strategy:
     if st.button("Suggest Strategy"):
         basket_txt = ", ".join(comps_selected or [primary])
         prompt = (
-            f"Design a {goal.lower()} strategy using the basket [{basket_txt}]. "
-            f"Sector focus: {sector_in}. Hedge/avoid {avoid_sym}. "
-            f"Allocate ${capital} over {horizon} months. "
-            f"Pair betas within {beta_rng[0]:.2f}-{beta_rng[1]:.2f}; "
-            f"shorts must carry a {stop_loss}% stop-loss. "
-            "Return 2–3 positions with dollar sizing and rationale."
+            f"Design a {goal.lower()} equity strategy using the basket [{basket_txt}]. "
+            f"Sector focus: {sector_in}. Hedge or avoid exposure to {avoid_sym}. "
+            f"Allocate a total of ${capital} over a {horizon}-month time horizon. "
+            f"Match pair betas within the range {beta_rng[0]:.2f} to {beta_rng[1]:.2f}, "
+            f"and apply a {stop_loss}% stop-loss to short positions. \n\n"
+            "Return a markdown table with the following columns: Ticker, Position (Long/Short), "
+            "Amount, and Rationale. Then provide a short paragraph summarizing the strategy. \n\n"
+            "**Also include 2–3 current risk factors associated with this strategy. For each risk, "
+            "cite the source explicitly (e.g., 'Source: Goldman Sachs Q2 Outlook, June 2025').**"
         )
+
         with st.spinner("Generating…"):
             plan = ask_openai(
                 model,
                 "You are a portfolio strategist. Output a table + narrative.",
                 prompt,
             )
+
         st.markdown("### 📌 Suggested Strategy")
         st.write(plan)
+
+        # Highlight risks
+        def extract_risks_section(text: str):
+            match = re.search(r"(### Risks.*?)(?=\n### |\Z)", text, re.DOTALL | re.IGNORECASE)
+            return match.group(1).strip() if match else None
+
+        risks = extract_risks_section(plan)
+        if risks:
+            st.markdown("### ⚠️ Highlighted Risks")
+            st.markdown(
+                f"<div style='background-color:#2a2e35; padding:16px; border-radius:10px; color:#f1f5f9;'>"
+                f"<pre style='white-space: pre-wrap; font-size: 14px;'>{risks}</pre></div>",
+                unsafe_allow_html=True
+            )
+        else:
+            st.info("No specific risks with sources were found in the strategy output.")
+
 
 # 3) Chat tab
 with tab_chat:
