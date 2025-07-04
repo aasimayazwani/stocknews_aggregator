@@ -38,6 +38,13 @@ if "tickers_selected" not in st.session_state:
 def add_to_history(role, txt):
     st.session_state.history.append((role, txt))
 
+def clean_llm_markdown(md: str) -> str:
+    # Fix common bold/italic issues caused by missing spaces or asterisks
+    md = re.sub(r"(\d)(?=[a-zA-Z])", r"\1 ", md)  # e.g., "1.35reflects" → "1.35 reflects"
+    md = re.sub(r"([a-zA-Z])(?=\d)", r"\1 ", md)  # e.g., "at1.28" → "at 1.28"
+    md = md.replace("*", "")  # optional: strip all asterisks if broken too often
+    return md
+
 # ───────────────────────── KPI helpers ─────────────────────────
 def quarters_sparkline(tkr: str, kpi: str = "revenue") -> go.Figure:
     """
@@ -430,8 +437,12 @@ with tab_outlook:
         )
 
     # 3.2  Show the raw LLM text in a card
+    #st.markdown("<div class='card'>", unsafe_allow_html=True)
+    #st.write(outlook_md)
+    #st.markdown("</div>", unsafe_allow_html=True)
+    outlook_md_clean = clean_llm_markdown(outlook_md)
     st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.write(outlook_md)
+    st.write(outlook_md_clean)
     st.markdown("</div>", unsafe_allow_html=True)
 
     # 3.3  Parse the numbers out of the LLM text
