@@ -4,6 +4,10 @@ import requests, yfinance as yf
 import pandas as pd
 import re
 import plotly.express as px
+import math
+from typing import Dict
+import plotly.graph_objects as go   # for the confidence gauge
+
 
 from config import DEFAULT_MODEL
 from stock_utils import get_stock_summary
@@ -20,6 +24,43 @@ if "tickers_selected" not in st.session_state:
 
 def add_to_history(role, txt):
     st.session_state.history.append((role, txt))
+
+# ───────────────────────── Earnings helpers ──────────────────────────
+def get_consensus_estimates(ticker: str) -> Dict[str, float]:
+    """
+    Return a dict with Street EPS and Revenue estimates for the *current* quarter.
+    Falls back to NaN if Yahoo data missing.
+    """
+    tk = yf.Ticker(ticker)
+    try:
+        # yfinance >= 0.2.31 provides .earnings_forecasts
+        eps = tk.earnings_forecasts.loc["eps_avg"][0]
+    except Exception:
+        eps = math.nan
+    try:
+        rev = tk.earnings_forecasts.loc["revenue_avg"][0] / 1e6  # convert to $M
+    except Exception:
+        rev = math.nan
+    return {"EPS": eps, "Revenue": rev}
+
+
+def extract_model_preds(outlook_md: str) -> Dict[str, float]:
+    """
+    Parse the LLM’s markdown and pull numeric model predictions for EPS & Revenue.
+    We assume lines like '**EPS**: $4.80' or '**Total Revenue**: $60 100 M'.
+    Expand the regex if you add more KPIs.
+    """
+    preds = {}
+    # EPS
+    eps_match = re.search(r"\bEPS.*?\$?([\d\.]+)", outlook_md, re.I)
+    if eps_match:
+        preds["EPS"] = float(eps_match.group(1).replace(",", ""))
+    # Revenue
+    rev_match = re.search(r"(?:Total )?Revenue.*?\$?([\d,\.]+)", outlook_md, re.I)
+    if rev_match:
+        preds["Revenue"] = float(rev_match.group(1).replace(",", ""))
+    return preds
+
 
 # ───────────────────────── Yahoo search helper ───────────────────
 # ───────────────────────── Yahoo search helper ───────────────────
@@ -293,25 +334,66 @@ with tab_chat:
         #st.experimental_rerun()
         st.rerun()
 
+# ───────────────────────── Tab 4: Quarterly Outlook ─────────────────────────
 with tab_outlook:
     st.subheader("🔮 Quarterly Outlook: Consensus Intelligence")
 
+    # 3.1  Build a richer prompt that asks for numeric predictions + probability + source
+    outlook_prompt = (
+        f"For {primary}, list the **two most-watched KPIs** (EPS and Total Revenue) "
+        f"for the upcoming quarter. For EACH KPI output:\n"
+        f"• Your numeric forecast (in same units analysts quote)\n"
+        f"• A qualitative label (Beat / Meet / Miss) **and** probability (0-100 %)\n"
+        f"• 1–2 sentence reasoning that ends with “Source: <title>, <publisher>, <date>”\n\n"
+        f"Then summarize one upside and one downside swing factor."
+    )
+
     with st.spinner("Analyzing forecast sentiment…"):
-        outlook_prompt = (
-            f"For the company {primary}, identify the most commonly tracked quarterly metrics "
-            f"based on its business model (e.g., sales volume, EPS, EBITDA, customer growth, etc.). "
-            f"Then use public signals, analyst expectations, and industry trends to infer whether each "
-            f"metric is likely to beat, meet, or miss expectations in the upcoming quarter. "
-            f"Also mention the likelihood of dividend increases, product launches, regulatory events, "
-            f"or revenue segment performance if applicable. Present this as a forecast summary "
-            f"including 3–5 predictions with reasoning."
+        outlook_md = ask_openai(
+            model,
+            "You are a seasoned sell-side analyst who must cite every claim.",
+            outlook_prompt,
         )
 
-        outlook = ask_openai(
-            model,
-            "You are a seasoned financial analyst with access to consensus research and market data.",
-            outlook_prompt
-        )
+    # 3.2  Show the raw LLM card
     st.markdown("### 📌 Forecast Summary")
-    st.write(outlook)
+    st.write(outlook_md)
+
+    # 3.3  Compute Street vs Model deltas for EPS & Revenue
+    street = get_consensus_estimates(primary)
+    preds  = extract_model_preds(outlook_md)
+
+    delta_rows = []
+    for kpi in ["Revenue", "EPS"]:
+        st_val   = street.get(kpi, math.nan)
+        mdl_val  = preds.get(kpi,  math.nan)
+        if math.isnan(st_val) or math.isnan(mdl_val):   # skip if missing
+            continue
+        delta_pct = (mdl_val - st_val) / st_val * 100
+        delta_rows.append(
+            f"| **{kpi}** | {st_val:,.2f} | {mdl_val:,.2f} | {delta_pct:+.1f}% |"
+        )
+
+    if delta_rows:
+        st.markdown("#### Street vs Model")
+        st.markdown(
+            "\n".join(
+                ["| KPI | Street | Model | Δ |",
+                 "|-----|--------|-------|---|"] + delta_rows
+            )
+        )
+
+    # 3.4  Render a confidence gauge if the LLM supplied one
+    prob_match = re.search(r"Probability.*?(\d{1,3}) ?%", outlook_md, re.I)
+    if prob_match:
+        prob = int(prob_match.group(1))
+        fig = go.Figure(
+            go.Indicator(
+                mode="gauge+number",
+                value=prob,
+                title={"text": "EPS Beat Probability"},
+                gauge={"axis": {"range": [0, 100]}}
+            )
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
