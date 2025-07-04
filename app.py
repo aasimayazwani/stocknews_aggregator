@@ -1,6 +1,6 @@
-# app.py ─ Multi-ticker Market-Movement Chatbot
+# app.py ─ Multi-ticker Market-Movement Chatbot  (autocomplete edition)
 import streamlit as st
-import yfinance as yf
+import requests, yfinance as yf
 import pandas as pd
 import plotly.express as px
 
@@ -11,12 +11,36 @@ from openai_client import ask_openai
 st.set_page_config(page_title="Market Movement Chatbot", layout="wide")
 st.title("📈 Market Movement Chatbot")
 
-# ─────────────────── Session state ───────────────────
+# ───────────────────────── Session state ─────────────────────────
 if "history" not in st.session_state:
     st.session_state.history = []
-def add_to_history(role, txt): st.session_state.history.append((role, txt))
+if "tickers_selected" not in st.session_state:
+    st.session_state.tickers_selected = ["AAPL", "MSFT"]  # sensible defaults
 
-# ─────────────────── Cached helpers ──────────────────
+def add_to_history(role, txt):
+    st.session_state.history.append((role, txt))
+
+# ───────────────────────── Yahoo search helper ───────────────────
+@st.cache_data(ttl=3600)
+def search_ticker_symbols(query: str, limit: int = 10):
+    """Return [{'symbol': 'AAPL', 'name': 'Apple Inc.'}, …] for a search query."""
+    url = "https://query2.finance.yahoo.com/v1/finance/search"
+    try:
+        resp = requests.get(url, params={"q": query, "quotesCount": limit,
+                                         "newsCount": 0, "lang": "en"}, timeout=4)
+        resp.raise_for_status()
+        data = resp.json().get("quotes", [])
+        out = []
+        for d in data:
+            sym = d.get("symbol", "").upper()
+            name = d.get("shortname") or d.get("longname") or ""
+            if sym and name:
+                out.append({"symbol": sym, "name": name})
+        return out
+    except Exception:
+        return []
+
+# ───────────────────────── Cached helpers ────────────────────────
 @st.cache_data(ttl=300)
 def fetch_stock_df(tickers, period):
     df = yf.download(tickers, period=period, progress=False)["Close"]
@@ -36,7 +60,7 @@ def fetch_competitors_llm(model, name, domain):
         lines = [ln.strip('",[] ') for ln in resp.splitlines()]
         return [ln.upper() for ln in lines if ln.isalpha()][:7]
 
-# ─────────────────── Sidebar: settings ───────────────
+# ───────────────────────── Sidebar settings ──────────────────────
 with st.sidebar.expander("⚙️ Settings", expanded=False):
     model = st.selectbox(
         "OpenAI Model",
@@ -45,18 +69,40 @@ with st.sidebar.expander("⚙️ Settings", expanded=False):
     )
     if st.button("🧹 Clear Chat History"):
         st.session_state.history = []
+    if st.button("🛑 Clear Tickers"):
+        st.session_state.tickers_selected = []
 
-# ─────────────────── Ticker input (basket) ───────────
-tickers_raw = st.text_input(
-    "Enter one or more tickers (comma-separated)", "AAPL, MSFT"
-)
-tickers = [t.strip().upper() for t in tickers_raw.split(",") if t.strip()]
+# ───────────────────────── Ticker search UI ──────────────────────
+st.markdown("### 🔍 Add tickers")
+search_q = st.text_input("Type company / ticker name (min 2 chars)", "", key="search_box")
+
+if len(search_q) >= 2:
+    matches = search_ticker_symbols(search_q)
+    if matches:
+        display_opts = [f"{m['name']}  ({m['symbol']})" for m in matches]
+        choice = st.selectbox("Suggestions", display_opts, index=0, key="suggest_box")
+        if st.button("➕ Add to basket", key="add_btn"):
+            chosen_sym = choice.split("(")[-1].rstrip(")")
+            if chosen_sym not in st.session_state.tickers_selected:
+                st.session_state.tickers_selected.append(chosen_sym)
+                st.success(f"Added {chosen_sym}")
+
+# Manual fallback (keeps parity with old flow)
+manual_raw = st.text_input("Or paste comma-separated symbols", "")
+if manual_raw:
+    for t in manual_raw.split(","):
+        sym = t.strip().upper()
+        if sym and sym not in st.session_state.tickers_selected:
+            st.session_state.tickers_selected.append(sym)
+
+tickers = st.session_state.tickers_selected
 if not tickers:
+    st.info("Add at least one ticker to proceed.")
     st.stop()
 
-primary = tickers[0]  # first symbol drives snapshot & sector
+primary = tickers[0]  # first drives snapshot & sector
 
-# ─────────────────── Snapshot & metadata ─────────────
+# ───────────────────────── Snapshot & metadata ───────────────────
 summary = get_stock_summary(primary); add_to_history("bot", summary)
 try:
     info = yf.Ticker(primary).info
@@ -76,24 +122,26 @@ with st.sidebar:
     st.metric("Market Cap", f"${info.get('marketCap',0)/1e9:.1f} B")
     st.metric("P/E", str(info.get("trailingPE", "—")))
 
-# ─────────────────── Domain + competitor logic ──────
+# ───────────────────────── Domain & competitor logic ─────────────
 domains = [d for d in (sector, industry) if d] or ["General"]
 domain_selected = st.selectbox("Domain context", domains)
 
 if len(tickers) == 1:
     competitors_all = fetch_competitors_llm(model, primary, domain_selected)
-    basket = [primary] + competitors_all[:3]        # default compare list
+    basket = [primary] + competitors_all[:3]
 else:
-    competitors_all = tickers[1:]                   # treat extras as comps
-    basket = tickers                                # compare exactly what user typed
+    competitors_all = tickers[1:]
+    basket = tickers
 
-# ─────────────────── Tabs ───────────────────────────
+# ───────────────────────── Tabs ──────────────────────────────────
 tab_compare, tab_strategy, tab_chat = st.tabs(["📈 Compare", "🎯 Strategy", "💬 Chat"])
 
 # 1) Compare tab
 with tab_compare:
     st.subheader("Price Comparison")
-    comps_selected = st.multiselect("Select symbols to plot", basket, default=basket)
+    comps_selected = st.multiselect("Select symbols to plot",
+                                    options=basket + competitors_all,
+                                    default=basket)
     duration = st.selectbox("Duration", ["1mo", "3mo", "6mo", "1y"], 2)
     price_df = fetch_stock_df(comps_selected, duration)
     if price_df.empty:
@@ -107,7 +155,8 @@ with tab_compare:
         st.markdown("### Latest Prices")
         cols = st.columns(len(price_df.columns))
         for c, sym in zip(cols, price_df.columns):
-            ser, last, delta = price_df[sym], price_df[sym].iloc[-1], price_df[sym].pct_change().iloc[-1]*100
+            ser, last = price_df[sym], price_df[sym].iloc[-1]
+            delta = ser.pct_change().iloc[-1] * 100
             spark = px.line(ser, height=80).update_layout(
                 showlegend=False, margin=dict(l=0,r=0,t=0,b=0),
                 xaxis=dict(showticklabels=False), yaxis=dict(showticklabels=False)
@@ -157,4 +206,5 @@ with tab_chat:
         add_to_history("user", q)
         ctx = f"Summary: {summary}\nDomain: {domain_selected}\nTickers: {', '.join(basket)}"
         ans = ask_openai(model, "You are a helpful market analyst.", ctx + "\n\n" + q)
-        add_to_history("assistant", ans); st.experimental_rerun()
+        add_to_history("assistant", ans)
+        st.experimental_rerun()
