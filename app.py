@@ -441,9 +441,13 @@ with tab_outlook:
     #st.write(outlook_md)
     #st.markdown("</div>", unsafe_allow_html=True)
     outlook_md_clean = clean_llm_markdown(outlook_md)
-    st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.write(outlook_md_clean)
-    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Wrap in a styled card and display clean markdown as HTML
+    st.markdown(f"""
+    <div class='card'>
+    {outlook_md_clean}
+    </div>
+    """, unsafe_allow_html=True)
 
     # 3.3  Parse the numbers out of the LLM text
     def grab_num(pattern, text):
