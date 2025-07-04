@@ -41,24 +41,36 @@ def add_to_history(role, txt):
 # ───────────────────────── KPI helpers ─────────────────────────
 def quarters_sparkline(tkr: str, kpi: str = "revenue") -> go.Figure:
     """
-    Return a tiny line chart of the last 8 quarters of revenue or EPS.
-    kpi ∈ {"revenue", "eps"}
+    Tiny line chart for last 8 quarters of Revenue or Earnings.
+    kpi ∈ {"revenue", "earnings"}
     """
-    hist = yf.Ticker(tkr).earnings
-    if hist.empty:
+    tk = yf.Ticker(tkr)
+
+    # yfinance 0.2.x exposes quarterly_earnings; fall back to annual earnings
+    try:
+        df = tk.quarterly_earnings.copy()
+    except AttributeError:
+        df = tk.earnings.copy()
+
+    if not isinstance(df, pd.DataFrame) or df.empty:
         return go.Figure()
-    # yfinance returns FY data; we fake quarters by rolling mean if quarterly not present
-    if len(hist) < 8:
-        ser = hist.iloc[-8:][kpi.title()]
-    else:
-        ser = hist[kpi.title()].tail(8)
+
+    col_map = {"revenue": "Revenue", "earnings": "Earnings"}
+    sel_col = col_map.get(kpi.lower())
+    if sel_col not in df.columns:
+        return go.Figure()
+
+    ser = df[sel_col].tail(8)
+    ser.index = ser.index.astype(str)   # nicer x-axis tooltip
+
     fig = px.line(ser, height=110)
     fig.update_layout(
-        showlegend=False, margin=dict(l=0, r=0, t=0, b=0),
-        xaxis=dict(showticklabels=False), yaxis=dict(showticklabels=False),
+        showlegend=False,
+        margin=dict(l=0, r=0, t=0, b=0),
+        xaxis=dict(showticklabels=False),
+        yaxis=dict(showticklabels=False),
     )
     return fig
-
 
 def kpi_bar(street: float, model: float, label: str) -> go.Figure:
     """Horizontal bar showing Street vs Model for one KPI."""
@@ -91,7 +103,7 @@ def get_consensus_estimates(ticker: str) -> Dict[str, float]:
     except Exception:
         eps = math.nan
     try:
-        rev = tk.earnings_forecasts.loc["revenue_avg"][0] / 1e6  # convert to $M
+        rev = tk.earnings_forecasts.loc["revenue_avg"][0] / 1e9  # convert to $M
     except Exception:
         rev = math.nan
     return {"EPS": eps, "Revenue": rev}
@@ -415,7 +427,15 @@ with tab_outlook:
     # 3.3  Parse the numbers out of the LLM text
     def grab_num(pattern, text):
         m = re.search(pattern, text, re.I)
-        return float(m.group(1).replace(",", "")) if m else np.nan
+        if not m:
+            return np.nan
+        raw = m.group(1).replace(",", "")
+        val = float(raw)
+        # look ahead for optional “B”/“M”
+        suffix_match = re.search(rf"{re.escape(raw)}\s*([BM])", text[m.end()-3:m.end()+2], re.I)
+        if suffix_match and suffix_match.group(1).upper() == "M":
+            val /= 1_000  # convert millions → billions
+        return val
 
     eps_model   = grab_num(r"EPS.*?\$?([\d\.]+)", outlook_md)
     rev_model   = grab_num(r"Revenue.*?\$?([\d\.]+)", outlook_md)
@@ -424,15 +444,29 @@ with tab_outlook:
     prob_match  = re.search(r"Probability.*?(\d{1,3}) ?%", outlook_md, re.I)
     prob_eps    = int(prob_match.group(1)) if prob_match else None
 
-    # 3.4  Metric cards (Model vs Street)
+        # helper right above this block (or put it with your helpers section)
+    def pct_delta(model_val, street_val):
+        if np.isnan(model_val) or np.isnan(street_val) or street_val == 0:
+            return ""
+        return f"{(model_val - street_val) / street_val * 100:+.1f}% vs Street"
+
+    # ─── key-numbers block ───────────────────────────────────────────
     st.markdown("#### 📈 Key Numbers")
     cols = st.columns(2)
-    cols[0].metric("EPS (Model)",   f"${eps_model:,.2f}",
-                   delta=f"{(eps_model - eps_street)/eps_street*100:+.1f}% vs Street")
-    cols[1].metric("Revenue (Model)", f"${rev_model:,.1f} B",
-                   delta=f"{(rev_model - rev_street)/rev_street*100:+.1f}% vs Street")
 
-    # 3.5  Comparison bar charts
+    cols[0].metric(
+        "EPS (Model)",
+        f"${eps_model:,.2f}",
+        delta=pct_delta(eps_model, eps_street),
+    )
+
+    cols[1].metric(
+        "Revenue (Model)",
+        f"${rev_model:,.1f} B",
+        delta=pct_delta(rev_model, rev_street),
+    )
+
+    # 3.5  Comparison bar charts (unchanged)
     st.plotly_chart(kpi_bar(eps_street, eps_model, "EPS"), use_container_width=True)
     st.plotly_chart(kpi_bar(rev_street, rev_model, "Revenue (B)"), use_container_width=True)
 
@@ -452,10 +486,10 @@ with tab_outlook:
     st.markdown("#### 🕒 8-Q Trend")
     spark_cols = st.columns(2)
     spark_cols[0].plotly_chart(quarters_sparkline(primary, "revenue"),
-                               use_container_width=True)
+                                use_container_width=True)
     spark_cols[0].caption("Revenue history")
     spark_cols[1].plotly_chart(quarters_sparkline(primary, "eps"),
-                               use_container_width=True)
+                                use_container_width=True)
     spark_cols[1].caption("EPS history")
 
 
