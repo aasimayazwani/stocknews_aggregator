@@ -94,12 +94,20 @@ if len(search_q) >= 2:
         if matches:
             display_opts = [f"{m['name']}  ({m['symbol']})" for m in matches]
             choice = st.selectbox("Suggestions", display_opts, index=0, key="suggest_box")
+            #if st.button("➕ Add to basket", key="add_btn"):
+            #    chosen_sym = choice.split("(")[-1].rstrip(")")
+            #    if chosen_sym not in st.session_state.tickers_selected:
+            #        st.session_state.tickers_selected.append(chosen_sym)
+            #        st.success(f"Added {chosen_sym}")
             if st.button("➕ Add to basket", key="add_btn"):
                 chosen_sym = choice.split("(")[-1].rstrip(")")
-                if chosen_sym not in st.session_state.tickers_selected:
-                    st.session_state.tickers_selected.append(chosen_sym)
-                    st.success(f"Added {chosen_sym}")
+                default_seed = {"AAPL", "MSFT"}
+                if set(st.session_state.tickers_selected) == default_seed:
+                    st.session_state.tickers_selected = []  # clear default demo list
 
+                if chosen_sym not in st.session_state.tickers_selected:
+                    st.session_state.tickers_selected.insert(0, chosen_sym)  # insert at top
+                st.experimental_rerun()
 # Manual fallback (keeps parity with old flow)
 #manual_raw = st.text_input("Or paste comma-separated symbols", "")
 #if manual_raw:
@@ -113,7 +121,13 @@ if not tickers:
     st.info("Add at least one ticker to proceed.")
     st.stop()
 
-primary = tickers[0]  # first drives snapshot & sector
+#primary = tickers[0]  # first drives snapshot & sector
+primary = st.selectbox(
+    "Reference ticker (drives snapshot & peers)",
+    options=tickers,
+    index=0,
+    key="primary_select",
+)
 
 # ───────────────────────── Snapshot & metadata ───────────────────
 summary = get_stock_summary(primary); add_to_history("bot", summary)
