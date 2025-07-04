@@ -72,7 +72,8 @@ def fetch_competitors_llm(model, name, domain):
 with st.sidebar.expander("⚙️ Settings", expanded=False):
     model = st.selectbox(
         "OpenAI Model",
-        [DEFAULT_MODEL, "gpt-4.1-mini", "gpt-4o-mini", "gpt-3.5-turbo", "gpt-4", "gpt-4o"],
+        #[DEFAULT_MODEL, "gpt-4.1-mini", "gpt-4o-mini", "gpt-3.5-turbo", "gpt-4", "gpt-4o"],
+        [DEFAULT_MODEL, "gpt-4.1-mini", "gpt-4o-mini"],
         0,
     )
     if st.button("🧹 Clear Chat History"):
