@@ -64,35 +64,40 @@ def clean_llm_markdown(md: str) -> str:
     return md
 
 def quarters_sparkline(tk, metric: str):
-    """Return sparkline for revenue, EPS, or net income."""
-    import plotly.graph_objects as go
-
-    # Try to use quarterly_earnings; fallback to income_stmt
+    """Return sparkline chart for revenue or EPS trends."""
     df = None
+
+    # 1. Try quarterly_earnings (newer yfinance versions)
     try:
-        df = tk.quarterly_earnings
+        if hasattr(tk, "quarterly_earnings") and isinstance(tk.quarterly_earnings, pd.DataFrame):
+            df = tk.quarterly_earnings.copy()
+            df = df.reset_index().rename(columns={"Quarter": "Quarter", "Earnings": "Value"})
     except Exception:
         pass
 
-    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+    # 2. Fallback: try income_stmt if df is still None or empty
+    if df is None or df.empty:
         try:
             income_stmt = tk.income_stmt
             if isinstance(income_stmt, pd.DataFrame):
                 if metric == "revenue" and "Total Revenue" in income_stmt.index:
                     df = income_stmt.loc["Total Revenue"].to_frame().reset_index()
                     df.columns = ["Quarter", "Value"]
-                elif metric in ["eps", "earnings"] and "Net Income" in income_stmt.index:
+                elif metric == "eps" and "Net Income" in income_stmt.index:
                     df = income_stmt.loc["Net Income"].to_frame().reset_index()
                     df.columns = ["Quarter", "Value"]
         except Exception:
             df = pd.DataFrame()
 
-    if df is None or df.empty:
+    # 3. Final safety check
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
         return go.Figure()
 
+    # Plot
     fig = go.Figure()
     fig.add_trace(go.Scatter(
-        x=df["Quarter"], y=df["Value"],
+        x=df["Quarter"],
+        y=df["Value"],
         mode="lines+markers",
         line=dict(color="skyblue")
     ))
@@ -101,9 +106,10 @@ def quarters_sparkline(tk, metric: str):
         height=160,
         margin=dict(t=10, l=10, r=10, b=10),
         xaxis_title=None,
-        yaxis_title="Value",
+        yaxis_title="Value"
     )
     return fig
+
 
 def kpi_bar(street: float, model: float, label: str) -> go.Figure:
     """Horizontal bar showing Street vs Model for one KPI."""
