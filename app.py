@@ -49,7 +49,8 @@ if "tickers_selected" not in st.session_state:
     st.session_state.tickers_selected: List[str] = ["AAPL", "MSFT"]
 if "outlook_md" not in st.session_state:
     st.session_state.outlook_md: str | None = None
-
+if "last_summary_ticker" not in st.session_state:
+    st.session_state.last_summary_ticker = None
 
 def add_to_history(role: str, txt: str) -> None:
     st.session_state.history.append((role, txt))
@@ -217,8 +218,10 @@ if not tickers:
     st.stop()
 
 # ───────────────────────── Snapshot (sidebar) ───────────────────────
-summary = get_stock_summary(primary)
-add_to_history("bot", summary)
+if primary != st.session_state.last_summary_ticker:
+    summary = get_stock_summary(primary)
+    add_to_history("bot", summary)
+    st.session_state.last_summary_ticker = primary
 
 try:
     info = yf.Ticker(primary).info
