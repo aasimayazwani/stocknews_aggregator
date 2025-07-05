@@ -1,18 +1,13 @@
-# app.py – Market‑Movement Chatbot (single‑screen strategy edition)
-"""Streamlit app that helps investors design equity strategies.
+# app.py – Market-Movement Chatbot (single-screen strategy edition)
+"""Streamlit application that helps investors design equity strategies,
+peek at quarterly outlooks, compare prices, and chat about markets."""
 
-Main layout:
-• Sidebar: settings, snapshot, quarterly outlook, optional price‑chart toggle
-• Main page: stock selection, strategy designer, conditional charts, chat
-
-All helper logic kept inside this single file for easy deployment to
-Streamlit Cloud or local use.
-"""
+from __future__ import annotations
 
 import math
 import re
 import textwrap
-from typing import Dict, List
+from typing import List
 
 import numpy as np
 import pandas as pd
@@ -22,24 +17,24 @@ import requests
 import streamlit as st
 import yfinance as yf
 
-from config import DEFAULT_MODEL
-from openai_client import ask_openai
-from stock_utils import get_stock_summary
+from config import DEFAULT_MODEL          # local module
+from openai_client import ask_openai      # wrapper around OpenAI API
+from stock_utils import get_stock_summary # your own helper
 
-# ────────────────────────────── Set‑up ──────────────────────────────
+
+# ───────────────────────────── UI / THEME ─────────────────────────────
 st.set_page_config(page_title="Strategy Chatbot", layout="wide")
 
-# ---------- Global CSS ----------
 st.markdown(
     """
     <style>
-    .card        {background:#1e1f24;padding:18px;border-radius:12px;margin-bottom:18px;}
-    .metric-tile {background:#f1f5f90D;border:1px solid #33415550;padding:18px 22px;border-radius:12px;
-                  transition:background .2s;cursor:pointer;}
+    .card{background:#1e1f24;padding:18px;border-radius:12px;margin-bottom:18px;}
+    .metric-tile{background:#f1f5f90D;border:1px solid #33415550;padding:18px 22px;border-radius:12px;
+                 transition:background .2s;cursor:pointer;}
     .metric-tile:hover{background:#33415522;}
     .metric-title{font-weight:600;font-size:18px;margin-bottom:6px;}
     .metric-value{font-size:22px;font-weight:700;}
-    .chevron     {float:right;font-size:20px;line-height:18px;transform:translateY(2px);}
+    .chevron{float:right;font-size:20px;line-height:18px;transform:translateY(2px);}
     </style>
     """,
     unsafe_allow_html=True,
@@ -47,7 +42,7 @@ st.markdown(
 
 st.title("🎯 Equity Strategy Assistant")
 
-# ───────────────────────── Session State ──────────────────────────
+# ───────────────────────────── Session State ──────────────────────────
 if "history" not in st.session_state:
     st.session_state.history: List = []
 if "tickers_selected" not in st.session_state:
@@ -55,20 +50,19 @@ if "tickers_selected" not in st.session_state:
 if "outlook_md" not in st.session_state:
     st.session_state.outlook_md: str | None = None
 
+
 def add_to_history(role: str, txt: str) -> None:
     st.session_state.history.append((role, txt))
 
-# ───────────────────────── Helper Functions ───────────────────────
 
+# ───────────────────────────── Helpers ────────────────────────────────
 def clean_llm_markdown(md: str) -> str:
-    """Light clean‑up: remove stray emphasis and join words/digits."""
     md = re.sub(r"(\d)(?=[a-zA-Z])", r"\1 ", md)
     md = re.sub(r"([a-zA-Z])(?=\d)", r"\1 ", md)
     return md.replace("*", "").replace("_", "")
 
 
 def quarters_sparkline(tk: yf.Ticker, metric: str) -> go.Figure:
-    """Return a tiny Plotly figure for quarterly revenue or earnings."""
     df = None
     try:
         if hasattr(tk, "quarterly_earnings") and isinstance(tk.quarterly_earnings, pd.DataFrame):
@@ -104,34 +98,6 @@ def quarters_sparkline(tk: yf.Ticker, metric: str) -> go.Figure:
     return fig
 
 
-# ------------- small numeric extractor -------------
-
-def grab_num(pattern: str, text: str) -> float:
-    """Return the first captured float in *text* matching *pattern*.
-
-    • Removes commas  • Handles optional $  • Converts “M” → billions
-    • Returns np.nan if not found / bad float
-    """
-    m = re.search(pattern, text, re.I)
-    if not m:
-        return np.nan
-
-    raw = m.group(1).replace(",", "")
-    try:
-        val = float(raw)
-    except ValueError:
-        return np.nan
-
-    # Look right after the number for a unit suffix
-    suffix = re.search(rf"{re.escape(raw)}\s*([MB])", text[m.end() - 1 : m.end() + 2], re.I)
-    if suffix and suffix.group(1).upper() == "M":
-        val /= 1_000  # convert millions → billions
-
-    return val
-
-
-# ------------- Yahoo ticker search -------------
-
 @st.cache_data(ttl=3600, show_spinner=False)
 def search_ticker_symbols(query: str, limit: int = 10):
     url = "https://query2.finance.yahoo.com/v1/finance/search"
@@ -149,8 +115,6 @@ def search_ticker_symbols(query: str, limit: int = 10):
         if q.get("symbol")
     ]
 
-
-# ------------- yfinance helpers -------------
 
 @st.cache_data(ttl=300)
 def fetch_stock_df(tickers: List[str], period: str) -> pd.DataFrame:
@@ -171,11 +135,11 @@ def fetch_competitors_llm(model: str, name: str, domain: str) -> List[str]:
         lst = ast.literal_eval(resp.strip())
         return [t.upper() for t in lst if isinstance(t, str)]
     except Exception:
-        lines = [ln.strip('",[] ') for ln in resp.splitlines()]
+        lines = [ln.strip('\",[] ') for ln in resp.splitlines()]
         return [ln.upper() for ln in lines if ln.isalpha()][:7]
 
 
-# ───────────────────────── Sidebar – Settings ────────────────────
+# ───────────────────────────── Sidebar (Settings) ────────────────────
 with st.sidebar.expander("⚙️ Settings", expanded=False):
     model = st.selectbox("OpenAI Model", [DEFAULT_MODEL, "gpt-4.1-mini", "gpt-4o-mini"], 0)
     if st.button("🧹 Clear Chat History"):
@@ -183,71 +147,76 @@ with st.sidebar.expander("⚙️ Settings", expanded=False):
     if st.button("🛑 Clear Tickers"):
         st.session_state.tickers_selected = []
 
-# Sidebar toggles
 show_charts = st.sidebar.checkbox("📈 Show Price Charts", value=False)
 
-# ───────────── Quarterly Outlook expander ─────────────
+# ─────────────────────── Sidebar (Quarterly Outlook) ─────────────────
 with st.sidebar.expander("🔮 Quarterly Outlook", expanded=False):
     if st.button("↻ Generate Outlook", key="btn_outlook"):
-        st.session_state.outlook_md = None  # force refresh
+        st.session_state.outlook_md = None  # reset
 
     if st.session_state.outlook_md is None:
-        # first pass – schedule generation and rerun
+        # Schedule generation on next rerun
         st.session_state.outlook_md = "Generating…"
         st.experimental_rerun()
 
     elif st.session_state.outlook_md == "Generating…":
-        # second pass – actually call the LLM
+        # Do the LLM call
         primary_tmp = st.session_state.tickers_selected[0]
-        prompt = (
+        outlook_prompt = (
             f"Provide numeric forecasts for **EPS** and **Total Revenue** for {primary_tmp}'s next quarter. "
             f"Include your prediction, Street consensus, and beat probability in %. "
             f"Add one sentence of reasoning ending with 'Source: …'. "
             f"Return in markdown: a table plus bullets, no code fences."
         )
         with st.spinner("Contacting LLM…"):
-            raw_md = ask_openai(model, "You are a senior equity analyst, precise and data-driven.", prompt)
+            raw_md = ask_openai(
+                model=model,
+                system_prompt="You are a senior equity analyst, precise and data-driven.",
+                user_prompt=outlook_prompt,
+            )
         st.session_state.outlook_md = clean_llm_markdown(raw_md)
         st.experimental_rerun()
 
     else:
         st.markdown(f"<div class='card'>{st.session_state.outlook_md}</div>", unsafe_allow_html=True)
 
-# ───────────────────────── Stock Selection UI ───────────────────
+# ──────────────────────── Stock-selection UI ────────────────────────
 st.markdown("### 📌 Stock Selection")
 col1, col2 = st.columns([3, 2])
 
 with col1:
-    search_q = st.text_input("Search company or ticker", "", key="search_box")
+    q = st.text_input("Search company or ticker", "", key="search_box")
 
 with col2:
-    tickers = st.session_state.tickers_selected
-    primary = tickers[0] if tickers else None
-    if tickers:
-        primary = st.selectbox("Primary ticker", options=tickers, index=0, key="primary_select")
+    current = st.session_state.tickers_selected
+    if current:
+        primary = st.selectbox("Primary ticker", options=current, index=0, key="primary_select")
+    else:
+        primary = None
 
-# Autocomplete suggestions
-if len(search_q) >= 2:
-    matches = search_ticker_symbols(search_q)
+# Autocomplete dropdown
+if len(q) >= 2:
+    matches = search_ticker_symbols(q)
     if matches:
         display_opts = [f"{m['name']} ({m['symbol']})" for m in matches]
         choice = st.selectbox("Suggestions", display_opts, index=0, key="suggest_box")
-        if st.button("➕ Add", key="add_btn"):
+        if st.button("➕ Add", key="btn_add_ticker"):
             sym = choice.split("(")[-1].rstrip(")")
             default_seed = {"AAPL", "MSFT"}
-            if set(tickers) == default_seed:
-                tickers.clear()
-            if sym not in tickers:
-                tickers.insert(0, sym)
+            if set(st.session_state.tickers_selected) == default_seed:
+                st.session_state.tickers_selected = []
+            if sym not in st.session_state.tickers_selected:
+                st.session_state.tickers_selected.insert(0, sym)
             st.rerun()
     else:
-        st.info("No matches yet… keep typing")
+        st.info("No matches yet…")
 
+tickers = st.session_state.tickers_selected
 if not tickers:
     st.info("Add at least one ticker to proceed.")
     st.stop()
 
-# ───────────────────────── Snapshot & Metadata ───────────────────
+# ───────────────────────── Snapshot (sidebar) ───────────────────────
 summary = get_stock_summary(primary)
 add_to_history("bot", summary)
 
@@ -260,4 +229,128 @@ except Exception:
 try:
     hist = yf.Ticker(primary).history(period="5d")["Close"]
     last_px = hist.iloc[-1]
-    pct_px = (last_px - hist.iloc[-2]) / hist.iloc[-
+    pct_px = (last_px - hist.iloc[-2]) / hist.iloc[-2] * 100
+except Exception:
+    last_px = pct_px = float("nan")
+
+with st.sidebar:
+    st.markdown("### 🧾 Snapshot", unsafe_allow_html=True)
+    st.markdown(
+        f"""
+        <div style='text-align:center;font-size:30px;font-weight:bold;color:white;'>${last_px:.2f}</div>
+        <div style='text-align:center;font-size:16px;color:{"green" if pct_px>=0 else "red"};'>{pct_px:+.2f}%</div>
+        <hr style='margin:10px 0;border:1px solid #333;'/>
+        <div style='font-size:13px;'>Market Cap: <b>${info.get('marketCap',0)/1e9:.2f} B</b></div>
+        <div style='font-size:13px;'>P/E Ratio: <b>{info.get('trailingPE','—')}</b></div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+# ───────────────────────── Competitors / Basket ────────────────────
+domains = [d for d in (sector, industry) if d] or ["General"]
+domain_selected = st.selectbox("Domain context", domains)
+
+if len(tickers) == 1:
+    competitors_all = fetch_competitors_llm(model, primary, domain_selected)
+    basket = [primary] + competitors_all[:3]
+else:
+    competitors_all = tickers[1:]
+    basket = tickers
+
+# ───────────────────────── Strategy Designer ───────────────────────
+st.subheader("📑 Strategy Designer")
+default_sector, default_avoid = sector or industry or "", primary
+sector_in = st.text_input("Sector focus", default_sector)
+goal      = st.selectbox("Positioning goal", ["Long", "Short", "Hedged", "Neutral"])
+avoid_sym = st.text_input("Hedge / avoid ticker", default_avoid)
+capital   = st.number_input("Capital (USD)", 1000, step=1000, value=10000)
+horizon   = st.slider("Time horizon (months)", 1, 24, 6)
+
+with st.expander("⚖️ Risk Controls", False):
+    beta_rng  = st.slider("Beta match band", 0.5, 1.5, (0.8, 1.2), 0.05)
+    stop_loss = st.slider("Stop-loss for shorts (%)", 1, 20, 10)
+
+if st.button("Suggest Strategy"):
+    basket_txt = ", ".join(basket)
+    prompt = (
+        f"Design a {goal.lower()} equity strategy using the basket [{basket_txt}]. "
+        f"Sector focus: {sector_in}. Hedge or avoid exposure to {avoid_sym}. "
+        f"Allocate a total of ${capital} over a {horizon}-month time horizon. "
+        f"Match pair betas within {beta_rng[0]:.2f}-{beta_rng[1]:.2f}, "
+        f"and apply a {stop_loss}% stop-loss to shorts.\n\n"
+        "Return a markdown table with columns: Ticker, Position, Amount, Rationale, "
+        "then a concise summary and 2-3 risk factors with explicit sources."
+    )
+    with st.spinner("Generating…"):
+        plan = ask_openai(model, "You are a portfolio strategist.", prompt)
+
+    st.markdown("### 📌 Suggested Strategy")
+    st.write(plan)
+
+    match = re.search(r"(### Risks.*?)(?=\n### |\Z)", plan, re.DOTALL | re.I)
+    if match:
+        st.markdown("### ⚠️ Highlighted Risks")
+        st.markdown(
+            f"<div class='card'><pre style='white-space:pre-wrap;font-size:14px;'>"
+            f"{match.group(1).strip()}</pre></div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.info("No specific risks cited by the model.")
+
+# ───────────────────────── Price Charts (optional) ─────────────────
+if show_charts:
+    st.subheader("📈 Price Comparison")
+    duration = st.selectbox("Duration", ["1mo", "3mo", "6mo", "1y"], 2, key="dur_sel")
+    comps_selected = st.multiselect(
+        "Tickers to plot", options=basket + competitors_all, default=basket, key="plot_sel"
+    )
+    if "SPY" not in comps_selected:
+        comps_selected.append("SPY")
+
+    price_df = fetch_stock_df(comps_selected, duration)
+    if price_df.empty:
+        st.error("No price data.")
+    else:
+        st.plotly_chart(
+            px.line(price_df, title=f"Prices ({duration})", labels={"value": "Price", "variable": "Ticker"}),
+            use_container_width=True,
+        )
+
+        st.markdown("### 💹 Latest Prices")
+        cols = st.columns(len(price_df.columns))
+        for c, sym in zip(cols, price_df.columns):
+            ser = price_df[sym]
+            last = ser.iloc[-1]
+            delta = ser.pct_change().iloc[-1] * 100
+            with c:
+                st.plotly_chart(
+                    px.line(ser, height=80)
+                    .update_layout(
+                        showlegend=False,
+                        margin=dict(l=0, r=0, t=0, b=0),
+                        xaxis=dict(showticklabels=False),
+                        yaxis=dict(showticklabels=False),
+                    ),
+                    use_container_width=True,
+                )
+                st.markdown(
+                    f"<div style='font-size:20px;font-weight:bold;'>{sym}</div>"
+                    f"<div style='font-size:18px;'>${last:.2f}</div>"
+                    f"<div style='color:{'green' if delta>=0 else 'red'};'>{delta:+.2f}%</div>",
+                    unsafe_allow_html=True,
+                )
+
+# ───────────────────────── Quick Chat (optional) ───────────────────
+st.markdown("---")
+st.header("💬 Quick Chat (optional)")
+for role, msg in st.session_state.history:
+    st.chat_message(role).write(msg)
+
+q = st.chat_input("Ask anything…")
+if q:
+    add_to_history("user", q)
+    ctx = f"Summary: {summary}\nDomain: {domain_selected}\nTickers: {', '.join(basket)}"
+    ans = ask_openai(model, "You are a helpful market analyst.", ctx + "\n\n" + q)
+    add_to_history("assistant", ans)
+    st.rerun()
