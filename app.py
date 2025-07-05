@@ -164,28 +164,52 @@ with st.expander("⚖️  Risk controls"):
     beta_rng  = st.slider("Beta match band", 0.5, 1.5, (0.8, 1.2), 0.05)
     stop_loss = st.slider("Stop-loss for shorts (%)", 1, 20, 10)
 
+# ─────────────────────── Strategy generation & rendering ───────────────────────
 if st.button("Suggest strategy", type="primary"):
-    ignore_txt = "; ".join(st.session_state.risk_ignore)
+    # 1.  Build prompt ----------------------------------------------------------
+    ignored = "; ".join(st.session_state.risk_ignore) or "None"
+    risk_string = ", ".join(risk_list) or "None"
+
     prompt = textwrap.dedent(f"""
-        Design a {goal.lower()} strategy around the basket [{', '.join(basket)}].
-        Sector focus: {sector_in}. Hedge/avoid: {avoid_sym}.
-        Capital: ${capital:,.0f}; Horizon: {horizon} months.
-        Keep pair betas in {beta_rng[0]:.2f}-{beta_rng[1]:.2f}; stop-loss {stop_loss}%.
-        The following headline risks have been detected for {primary}: {', '.join(risk_list) or 'None'}.
-        EXCLUDE the following risks from consideration: {ignore_txt or 'None'}.
-        Return markdown with a table (Ticker | Position | Amount | Rationale),
-        a short summary, and 2-3 explicit residual risks with citations.
+        Act as a **portfolio strategist**.
+
+        • **Basket**: {', '.join(basket)}
+        • **Sector**: {sector_in}
+        • **Goal**: {goal.lower()}
+        • **Hedge / avoid**: {avoid_sym}
+        • **Capital**: ${capital:,.0f}
+        • **Horizon**: {horizon} months
+        • **Beta band**: {beta_rng[0]:.2f}–{beta_rng[1]:.2f}
+        • **Stop-loss**: {stop_loss} %
+        • **Detected headline risks** for {primary}: {risk_string}
+        • **Ignore** the following risks when constructing the strategy: {ignored}
+
+        **Return EXACTLY in this markdown order**:
+
+        1️⃣ A table (markdown pipe format) with columns **Ticker | Position | Amount ($) | Rationale | Source**  
+           – Put the full clickable URL in the *Source* column of each row.
+
+        2️⃣ `### Summary` – 2–3 plain sentences (max 300 chars) – NO italics/bold inside.
+
+        3️⃣ `### Residual Risks` – a numbered list; each bullet ≤ 25 words and **MUST end with a source URL in parentheses**.
+
+        Do not wrap anything in code-fences.
     """).strip()
 
-    with st.spinner("Calling LLM…"):
-        plan = ask_openai(model, "You are a portfolio strategist.", prompt)
+    # 2.  Call OpenAI -----------------------------------------------------------
+    with st.spinner("Calling ChatGPT…"):
+        raw_md = ask_openai(model, "You are a precise, citation-rich strategist.", prompt)
 
-    st.subheader("📌  Suggested strategy")
-    st.write(plan)
+    # 3.  Clean & show ----------------------------------------------------------
+    plan_md = clean_md(raw_md)
+    st.subheader("📌 Suggested strategy")
+    st.markdown(plan_md, unsafe_allow_html=True)
 
-    if m := re.search(r"(### Risks.*?)(?=\n### |\Z)", plan, re.I | re.S):
-        st.subheader("⚠️  Highlighted Risks")
-        st.markdown(f"<div class='card'>{m.group(1).strip()}</div>", unsafe_allow_html=True)
+    # 4.  Optionally pull out Residual Risks (to highlight in a card) ----------
+    match = re.search(r"### Residual Risks.*", plan_md, flags=re.I | re.S)
+    if match:
+        st.subheader("⚠️ Residual Risks (quick view)")
+        st.markdown(f"<div class='card'>{match.group(0)}</div>", unsafe_allow_html=True)
 
 # ─────────────────────────── OPTIONAL CHARTS ─────────────────────────
 if show_charts:
