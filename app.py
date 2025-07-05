@@ -157,7 +157,7 @@ with st.sidebar.expander("🔮 Quarterly Outlook", expanded=False):
     if st.session_state.outlook_md is None:
         # Schedule generation on next rerun
         st.session_state.outlook_md = "Generating…"
-        st.experimental_rerun()
+        st.rerun()
 
     elif st.session_state.outlook_md == "Generating…":
         # Do the LLM call
@@ -175,7 +175,7 @@ with st.sidebar.expander("🔮 Quarterly Outlook", expanded=False):
                 user_prompt=outlook_prompt,
             )
         st.session_state.outlook_md = clean_llm_markdown(raw_md)
-        st.experimental_rerun()
+        st.rerun()
 
     else:
         st.markdown(f"<div class='card'>{st.session_state.outlook_md}</div>", unsafe_allow_html=True)
