@@ -12,7 +12,7 @@ from config import DEFAULT_MODEL
 from stock_utils import get_stock_summary
 from openai_client import ask_openai
 
-st.set_page_config(page_title="Market Movement Chatbot", layout="wide")
+st.set_page_config(page_title="Strategy Chatbot", layout="wide")
 
 # ────────────────────────── Global CSS ───────────────────────────
 st.markdown("""
