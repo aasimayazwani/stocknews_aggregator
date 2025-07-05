@@ -47,23 +47,36 @@ def fetch_prices(tickers: List[str], period="2d"):
     return df.dropna(axis=1, how="all")
 
 @st.cache_data(ttl=900, show_spinner=False)
-def web_risk_scan(ticker: str) -> List[str]:
-    """Very light-weight DuckDuckGo instant-answer style scrape for ‘<ticker> stock risks’."""
+# ─────────────────── RISK-SCAN via ChatGPT instead of DuckDuckGo ──────────────────
+def web_risk_scan(ticker: str, model_name: str = DEFAULT_MODEL) -> List[str]:
+    """
+    Ask the LLM to give 5 concise, news-driven risk factors for the stock.
+    Returns a list of short strings; falls back to a placeholder if nothing comes back.
+    """
+    system = (
+        "You are a diligent equity risk analyst. "
+        "You scour today’s business news, analyst notes and macro data."
+    )
+    user = (
+        f"List the **five** most salient current RISK FACTORS that investors in {ticker} "
+        "should watch. One short bullet each (<20 words). "
+        "Return only a Python list like ['Weak PC demand', 'Regulatory antitrust scrutiny', …]."
+    )
+
+    raw = ask_openai(model=model_name, system_prompt=system, user_prompt=user)
+
+    # Try converting the model’s reply into a Python list safely
     try:
-        r = requests.get(
-            "https://api.duckduckgo.com",
-            params={"q": f"{ticker} stock risks", "format": "json", "no_redirect": "1"},
-            timeout=6,
-        )
-        r.raise_for_status()
-        rel = r.json().get("RelatedTopics", [])[:8]
-        texts = [t.get("Text", "") for t in rel if isinstance(t, dict) and t.get("Text")]
-        # basic clean-up
-        dedup = list(dict.fromkeys([re.sub(r"\.$", "", t.strip()) for t in texts if t.strip()]))
-        # fallback
-        return dedup or [f"No obvious current headline risks detected for {ticker}."]
+        import ast
+
+        lst = ast.literal_eval(raw.strip())
+        risks = [s.strip() for s in lst if isinstance(s, str) and s.strip()]
+        return risks or [f"No clear near-term risks surfaced for {ticker}."]
     except Exception:
-        return [f"Could not retrieve risk headlines for {ticker}."]
+        # Fallback: split by lines / commas if parsing fails
+        lines = [ln.strip("•- ").strip() for ln in raw.splitlines()]
+        risks = [ln for ln in lines if ln]
+        return risks[:5] or [f"No clear near-term risks surfaced for {ticker}."]
 
 # ────────────────────────── SIDEBAR – SETTINGS ───────────────────────
 with st.sidebar.expander("⚙️  Settings"):
@@ -100,6 +113,11 @@ st.divider()
 primary = st.selectbox("🎯  Focus stock", portfolio, 0)
 others  = [t for t in portfolio if t != primary]
 basket  = [primary] + others
+
+# ────────────────────── headline-risk retrieval (cached) ─────────────────────
+if primary not in st.session_state.risk_cache:
+    with st.spinner("Scanning news with ChatGPT…"):
+        st.session_state.risk_cache[primary] = web_risk_scan(primary, model)
 
 # ────────────────────── AUTOMATED RISK SCAN SECTION ───────────────────
 st.markdown("### 🔍  Key headline risks")
