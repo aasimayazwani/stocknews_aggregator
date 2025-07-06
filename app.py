@@ -395,18 +395,19 @@ if st.button("Suggest strategy", type="primary"):
 
         • **Basket**: {', '.join(basket)}
         • **Current allocation**: {alloc_str}
-        • **Sector**: {sector_in}
-        • **Capital**: ${capital:,.0f}
+        • **Total capital** (based on portfolio table): ${total_capital:,.0f}
         • **Horizon**: {horizon} months
         • **Beta band**: {beta_rng[0]:.2f}–{beta_rng[1]:.2f}
         • **Stop-loss**: {stop_loss} %
         • **Detected headline risks** for {primary}: {risk_string}
-        • **Ignore** the following risks when constructing the strategy: {ignored}
+        • **Ignore** the following risks when constructing the hedge: {ignored}
+
+        Your task is to design a tactical hedge that offsets risk while preserving exposure to high-conviction positions.
 
         **Return EXACTLY in this markdown order**:
 
         1️⃣ A table (markdown pipe format) with columns **Ticker | Position | Amount ($) | Rationale | Source**  
-           – Put the full clickable URL in the *Source* column of each row.
+        – Put the full clickable URL in the *Source* column of each row.
 
         2️⃣ `### Summary` – 2–3 plain sentences (max 300 chars) – NO italics/bold inside.
 
@@ -414,6 +415,7 @@ if st.button("Suggest strategy", type="primary"):
 
         Do not wrap anything in code-fences.
     """).strip()
+
 
     # 2.  Call OpenAI -----------------------------------------------------------
     with st.spinner("Calling ChatGPT…"):
