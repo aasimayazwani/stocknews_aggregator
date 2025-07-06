@@ -274,18 +274,16 @@ st.session_state.portfolio_alloc = dict(
     zip(clean_df["Ticker"], clean_df["Amount ($)"])
 )
 
-st.markdown("### 🧾 Portfolio Allocation by Ticker")
-
+# Rebuild summary table (needed for pie chart, even if no table UI shown)
 ticker_df = pd.DataFrame({
     "Ticker": list(st.session_state.portfolio_alloc.keys()),
     "Amount": list(st.session_state.portfolio_alloc.values())
 }).sort_values("Amount", ascending=False)
 
-st.dataframe(ticker_df, use_container_width=True)
-
-# Enhanced label with both ticker and amount
+# Add human-readable labels
 ticker_df["Label"] = ticker_df["Ticker"] + " ($" + ticker_df["Amount"].round(0).astype(int).astype(str) + ")"
 
+# Show the pie chart
 st.plotly_chart(
     px.pie(
         ticker_df,
@@ -296,8 +294,6 @@ st.plotly_chart(
     ).update_traces(textinfo="label+percent"),
     use_container_width=True
 )
-
-
 
 portfolio = st.session_state.portfolio
 
