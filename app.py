@@ -581,94 +581,39 @@ if st.button("Suggest strategy", type="primary"):
         except Exception as e:
             st.warning(f"Could not parse or merge hedge table: {e}")
 
-        # 🔍 📌 Hedge Strategy Rationale (dynamic, with links)
-        st.markdown("### 📌 Hedge Strategy Rationale")
+        # 🔍 📌 Hedge Strategy Rationale (dynamic, styled, and link-aware)
+    st.markdown("### 📌 Hedge Strategy Rationale")
 
-        hedge_only = df[df["Source"] == "Suggested hedge"]
+    hedge_only = df[df["Source"] == "Suggested hedge"]
 
-        if hedge_only.empty:
-            st.info("No hedge rationale to show.")
-        else:
-            total_hedge = hedge_only["Amount ($)"].sum()
-            st.markdown(
-                f"A total of **${total_hedge:,.0f}** was allocated to hedge instruments to mitigate key risks in the portfolio.\n\n"
-                "Below is the reasoning behind each hedge component:"
-            )
+    if hedge_only.empty:
+        st.info("No hedge rationale to show.")
+    else:
+        total_hedge = hedge_only["Amount ($)"].sum()
+        st.markdown(
+            f"A total of **${total_hedge:,.0f}** was allocated to hedge instruments to mitigate key risks in the portfolio."
+        )
+        st.markdown("Below is the explanation for each hedge component:")
 
-            for _, row in hedge_only.iterrows():
-                rationale = row.get("Rationale", "").strip()
-                source = row.get("Source", "").strip()
+        for _, row in hedge_only.iterrows():
+            ticker    = row.get("Ticker", "").strip()
+            position  = row.get("Position", "").strip().capitalize()
+            amount    = row.get("Amount ($)", 0)
+            rationale = row.get("Rationale", "").strip()
+            source    = row.get("Source", "").strip()
 
-                if re.match(r"^https?://", source):
-                    st.markdown(f"- **{row['Ticker']}** → {rationale}  \n  ↪ [Source]({source})")
-                else:
-                    st.markdown(f"- **{row['Ticker']}** → {rationale}")
+            hedge_block = f"""
+            <div style="background:#1e293b;padding:12px;border-radius:10px;margin-bottom:10px;color:#f1f5f9">
+                <b>{ticker} ({position})</b> — <span style="color:#22d3ee">${amount:,.0f}</span><br>
+                {rationale}
+            """
 
-    import io
-    import plotly.graph_objects as go
+            # If source is a URL, add a link
+            if re.match(r"^https?://", source):
+                hedge_block += f"""<br><a href="{source}" target="_blank" style="color:#60a5fa;">Source ↗</a>"""
 
-    # Try to parse the markdown table from the plan
-    md_lines = plan_md.splitlines()
-    table_lines = [line for line in md_lines if '|' in line and not line.startswith('###')]
-
-    if len(table_lines) >= 3:
-        try:
-            # STEP 1: Parse markdown table
-            table_str = '\n'.join(table_lines)
-            df = pd.read_csv(io.StringIO(table_str), sep='|')
-            df.columns = [c.strip() for c in df.columns]
-            df = df.dropna(subset=['Ticker', 'Amount ($)'])
-
-            # Clean and parse amounts
-            df["Amount ($)"] = (
-                df["Amount ($)"]
-                .astype(str)
-                .str.replace("$", "")
-                .str.replace(",", "")
-                .str.extract(r"(\d+\.?\d*)")[0]
-                .astype(float)
-            )
-            df["Price"] = "_n/a_"
-            df["Δ 1d %"] = "_n/a_"
-            df["Source"] = "Suggested hedge"
-
-            # Reorder columns for consistency
-            df = df[["Ticker", "Position", "Amount ($)", "Price", "Δ 1d %", "Rationale", "Source"]]
-
-            # STEP 2: Extract user portfolio as DataFrame
-            user_df = editor_df.copy()
-            user_df["Position"] = "Long"
-            user_df["Source"] = "User portfolio"
-            user_df["Rationale"] = "—"
-            user_df["Ticker"] = user_df["Ticker"].astype(str)
-            user_df = user_df[["Ticker", "Position", "Amount ($)", "Price", "Δ 1d %", "Rationale", "Source"]]
-
-            # STEP 3: Merge user + strategy dataframes
-            combined_df = pd.concat([user_df, df], ignore_index=True)
-            #st.markdown("---")  # Visually separates from earlier sections
-            #st.markdown("### 🧾 Unified Portfolio + Strategy Table")
-            #st.dataframe(combined_df, use_container_width=True)
-
-            # STEP 4: Pie Chart – Post-Hedge Allocation
-            pie_df = combined_df.copy()
-            pie_df["Label"] = pie_df["Ticker"] + " (" + pie_df["Position"] + ")"
-            pie_df["Amount"] = pie_df["Amount ($)"]
-
-            with st.sidebar:
-                if st.checkbox("📊 Show Post-Hedge Pie Chart", value=True, key="sidebar_post_hedge_pie"):
-                    st.markdown("#### 🧮 Post-Hedge Allocation")
-                    st.plotly_chart(
-                        px.pie(
-                            pie_df,
-                            names="Label",
-                            values="Amount",
-                            hole=0.3
-                        ).update_traces(textinfo="label+percent"),
-                        use_container_width=True
-                    )
-
-        except Exception as e:
-            st.warning(f"Could not render unified table or charts: {e}")
+            hedge_block += "</div>"
+            st.markdown(hedge_block, unsafe_allow_html=True)
 
 
 # ─────────────────────────── OPTIONAL CHARTS ─────────────────────────
