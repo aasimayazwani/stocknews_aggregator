@@ -584,14 +584,20 @@ if st.button("Suggest strategy", type="primary"):
                 .astype(float)
             )
 
+            # Add additional columns to hedge strategy table
             df["Price"] = "_n/a_"
             df["Δ 1d %"] = "_n/a_"
             df["Source"] = "Suggested hedge"
+
+            # Add % of Portfolio
             total_amount = df["Amount ($)"].sum()
             df["% of Portfolio"] = (df["Amount ($)"] / total_amount * 100).round(2)
-            df = df[["Ticker", "Position", "Amount ($)", "Price", "Δ 1d %", "Rationale", "Source"]]
 
-            # STEP 2: Combine with user's portfolio
+            # Reorder columns after all additions
+            cols = ["Ticker", "Position", "Amount ($)", "% of Portfolio", "Price", "Δ 1d %", "Rationale", "Source"]
+            df = df[cols]
+
+            # Now do the same for user-provided portfolio
             user_df = editor_df.copy()
             user_df["Position"] = "Long"
             user_df["Source"] = "User portfolio"
@@ -599,12 +605,8 @@ if st.button("Suggest strategy", type="primary"):
             user_df["% of Portfolio"] = (user_df["Amount ($)"] / user_total * 100).round(2)
             user_df["Rationale"] = "—"
             user_df["Ticker"] = user_df["Ticker"].astype(str)
-            user_df = user_df[["Ticker", "Position", "Amount ($)", "Price", "Δ 1d %", "Rationale", "Source"]]
-
-            cols = ["Ticker", "Position", "Amount ($)", "% of Portfolio", "Price", "Δ 1d %", "Rationale", "Source"]
-            df = df[cols]
             user_df = user_df[cols]
-            # STEP 3: Merge tables
+
             combined_df = pd.concat([user_df, df], ignore_index=True)
 
             # ✅ Store in session state to persist across reruns
