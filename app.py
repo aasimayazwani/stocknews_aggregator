@@ -15,7 +15,6 @@ from stock_utils import get_stock_summary # your own helper
 # ────────────────────────────────── THEME ─────────────────────────────────
 st.set_page_config(page_title="Strategy Chatbot", layout="wide")
 
-
 st.markdown(
     """
     <style>
@@ -50,41 +49,27 @@ st.markdown(
         font-size: 14px;
       }
 
-      /* All labels (inputs, sliders, etc) */
+      /* Label style for form fields */
       label {
         font-weight: 600;
         font-size: 0.88rem;
       }
 
-      /* Risk checkbox label container */
-      .checkbox-label {
-        display: inline-flex;
-        align-items: center;
-        font-size: 14px;
-        font-weight: 500;
+      /* Risk section grid layout */
+      .risk-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 12px;
+        margin-top: 10px;
+        margin-bottom: 16px;
       }
 
-      .checkbox-label a {
-        margin-left: 8px;
-        color: #60a5fa;
-        text-decoration: none;
-        font-size: 13px;
-      }
-
-      .checkbox-label a:hover {
-        text-decoration: underline;
-      }
-
-      /* Risk card (surrounds each checkbox + source) */
+      /* Individual risk card */
       .risk-card {
         background-color: #1f2937;
         border-radius: 10px;
         padding: 12px 16px;
-        margin: 8px 0;
         color: #f8fafc;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
         box-shadow: 0 0 0 1px #33415544;
         transition: background 0.2s ease-in-out;
       }
@@ -93,7 +78,37 @@ st.markdown(
         background-color: #273449;
       }
 
-      /* Optional: icon next to source */
+      /* Checkbox label inside card */
+      .risk-card label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 14px;
+        font-weight: 500;
+        width: 100%;
+        margin: 0;
+        cursor: pointer;
+      }
+
+      .risk-card input[type="checkbox"] {
+        margin-right: 10px;
+        transform: scale(1.2);
+        accent-color: #10b981; /* Tailwind green-500 */
+      }
+
+      /* Link icon inside card */
+      .risk-card a {
+        color: #60a5fa;
+        text-decoration: none;
+        font-size: 14px;
+        margin-left: 12px;
+      }
+
+      .risk-card a:hover {
+        text-decoration: underline;
+      }
+
+      /* Optional: icon if used */
       .risk-card i {
         font-style: normal;
         font-size: 13px;
@@ -104,6 +119,7 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
 
 st.title("🎯  Equity Strategy Assistant")
 
