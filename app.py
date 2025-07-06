@@ -637,9 +637,9 @@ if st.button("Suggest strategy", type="primary"):
 
             # STEP 3: Merge user + strategy dataframes
             combined_df = pd.concat([user_df, df], ignore_index=True)
-            st.markdown("---")  # Visually separates from earlier sections
-            st.markdown("### 🧾 Unified Portfolio + Strategy Table")
-            st.dataframe(combined_df, use_container_width=True)
+            #st.markdown("---")  # Visually separates from earlier sections
+            #st.markdown("### 🧾 Unified Portfolio + Strategy Table")
+            #st.dataframe(combined_df, use_container_width=True)
 
             # STEP 4: Pie Chart – Post-Hedge Allocation
             pie_df = combined_df.copy()
