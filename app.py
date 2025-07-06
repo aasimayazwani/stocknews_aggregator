@@ -330,7 +330,6 @@ if not tiles_df.empty:
             )
 
 st.divider()
-primary = st.selectbox("🎯  Focus stock", portfolio, 0)
 others  = [t for t in portfolio if t != primary]
 basket  = [primary] + others
 
