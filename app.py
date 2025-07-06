@@ -635,7 +635,8 @@ if st.button("Suggest strategy", type="primary"):
             if combined_df.empty:
                 st.warning("Combined hedge strategy is empty. Please re-generate.")
             else:
-                st.dataframe(combined_df, use_container_width=True)
+                pass
+                #st.dataframe(combined_df, use_container_width=True)
 
 
             with st.sidebar:
