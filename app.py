@@ -136,7 +136,7 @@ def clean_md(md: str) -> str:
     return md.replace("*", "").replace("_", "")
 
 
-def fallback_ticker_lookup(name: str, model_name: str = "gpt-3.5-turbo") -> str:
+def fallback_ticker_lookup(name: str, model_name: str = "gpt-4.1-mini") -> str:
     prompt = f"What is the stock ticker symbol for the publicly traded company '{name}'?"
     raw = ask_openai(
         model=model_name,
