@@ -152,33 +152,37 @@ def fetch_prices(tickers: List[str], period="2d"):
 # ─────────────────── RISK-SCAN via ChatGPT instead of DuckDuckGo ──────────────────
 def web_risk_scan(ticker: str, model_name: str = DEFAULT_MODEL) -> List[str]:
     """
-    Ask the LLM to give 5 concise, news-driven risk factors for the stock.
-    Returns a list of short strings; falls back to a placeholder if nothing comes back.
+    Ask the LLM to return 4–5 hedge-relevant macro/sector risks affecting a given stock.
+    Each item is concise and grounded in current economic or market context.
     """
     system = (
-        "You are a diligent equity risk analyst. "
-        "You scour today’s business news, analyst notes and macro data."
+        "You are a portfolio hedging strategist. "
+        "Your job is to identify macroeconomic, geopolitical, and sector-specific risk exposures "
+        "that should be hedged against for large equity positions."
     )
+
     user = (
-        f"List the **five** most salient current RISK FACTORS that investors in {ticker} "
-        "should watch. One short bullet each (<20 words). "
-        "Return only a Python list like ['Weak PC demand', 'Regulatory antitrust scrutiny', …]."
+        f"What are the 4–5 most relevant macro or sector-level RISK FACTORS "
+        f"that could affect {ticker}'s price or industry in the near term?\n\n"
+        "Return the answer as a plain Python list of short strings (each under 20 words), "
+        "e.g., ['Rising interest rates', 'Semiconductor supply chain issues', …].\n\n"
+        "No explanation, just the list."
     )
 
     raw = ask_openai(model=model_name, system_prompt=system, user_prompt=user)
 
-    # Try converting the model’s reply into a Python list safely
+    # Try parsing the LLM reply as a Python list
     try:
         import ast
 
         lst = ast.literal_eval(raw.strip())
         risks = [s.strip() for s in lst if isinstance(s, str) and s.strip()]
-        return risks or [f"No clear near-term risks surfaced for {ticker}."]
+        return risks or [f"No hedge-relevant risks identified for {ticker}."]
     except Exception:
-        # Fallback: split by lines / commas if parsing fails
+        # Fallback: use line or comma splitting
         lines = [ln.strip("•- ").strip() for ln in raw.splitlines()]
         risks = [ln for ln in lines if ln]
-        return risks[:5] or [f"No clear near-term risks surfaced for {ticker}."]
+        return risks[:5] or [f"No hedge-relevant risks identified for {ticker}."]
 
 # ────────────────────────── SIDEBAR – SETTINGS ───────────────────────
 with st.sidebar.expander("⚙️  Settings"):
@@ -360,7 +364,7 @@ with st.sidebar.expander("🔮  Quarterly outlook"):
             f"include Street consensus and beat probability (in %). End with 'Source: …'. "
             f"Return markdown (table + bullets)."
         )
-        md = ask_openai(model, "You are a senior equity analyst.", p)
+        md = ask_openai(model, "You are a senior hedge fund analyst.", p)
         st.session_state.outlook_md = clean_md(md); st.rerun()
     else:
         st.markdown(f"<div class='card'>{st.session_state.outlook_md}</div>", unsafe_allow_html=True)
