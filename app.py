@@ -136,6 +136,44 @@ def clean_md(md: str) -> str:
     md = re.sub(r"(\d)(?=[A-Za-z])", r"\1 ", md)
     return md.replace("*", "").replace("_", "")
 
+def render_rationale(df: pd.DataFrame) -> None:
+    """
+    Show a nicely-formatted card for every hedge instrument
+    in df.  Assumes columns: Ticker, Position, Amount ($),
+    Rationale, Source   (anything missing is handled gracefully).
+    """
+    if df.empty:
+        st.info("No hedge rationale to show.")
+        return
+
+    total = df["Amount ($)"].sum()
+    st.markdown(
+        f"A total of **${total:,.0f}** was allocated to hedge instruments "
+        "to mitigate key risks in the portfolio.\n\n"
+        "Below is the explanation for each hedge component:"
+    )
+
+    for _, row in df.iterrows():
+        tick   = row.get("Ticker", "—").strip()
+        pos    = row.get("Position", "—").title()
+        amt    = row.get("Amount ($)", 0)
+        rat    = row.get("Rationale", "No rationale provided").strip()
+        src    = row.get("Source", "").strip()
+
+        card  = (
+            f"<div style='background:#1e293b;padding:12px;border-radius:10px;"
+            f"margin-bottom:10px;color:#f1f5f9'>"
+            f"<b>{tick} ({pos})</b> — "
+            f"<span style='color:#22d3ee'>${amt:,.0f}</span><br>{rat}"
+        )
+
+        # add link if it looks like a URL
+        if re.match(r'^https?://', src):
+            card += f"<br><a href='{src}' target='_blank' style='color:#60a5fa;'>Source&nbsp;↗</a>"
+
+        card += "</div>"
+        st.markdown(card, unsafe_allow_html=True)
+
 
 def fallback_ticker_lookup(name: str, model_name: str = "gpt-4.1-mini") -> str:
     prompt = f"What is the stock ticker symbol for the publicly traded company '{name}'?"
@@ -534,6 +572,8 @@ if st.button("Suggest strategy", type="primary"):
             df = pd.read_csv(io.StringIO(table_str), sep='|')
             df.columns = [c.strip() for c in df.columns]
             df = df.dropna(subset=['Ticker', 'Amount ($)'])
+            df = df.dropna(how="all", axis=1)                       # remove unnamed first col if present
+            df = df[~df["Ticker"].str.contains(r"^-+|Ticker", na=False)]
 
             # Clean amounts
             df["Amount ($)"] = (
@@ -594,37 +634,11 @@ if st.button("Suggest strategy", type="primary"):
         # 🔍 📌 Hedge Strategy Rationale (dynamic, styled, and link-aware)
     st.markdown("### 📌 Hedge Strategy Rationale")
 
-    hedge_only = df[df["Source"] == "Suggested hedge"]
-
-    if hedge_only.empty:
+    hedge_df = st.session_state.get("strategy_df")   # <— safe fetch
+    if hedge_df is None or hedge_df.empty:
         st.info("No hedge rationale to show.")
     else:
-        total_hedge = hedge_only["Amount ($)"].sum()
-        st.markdown(
-            f"A total of **${total_hedge:,.0f}** was allocated to hedge instruments to mitigate key risks in the portfolio."
-        )
-        st.markdown("Below is the explanation for each hedge component:")
-
-        for _, row in hedge_only.iterrows():
-            ticker    = row.get("Ticker", "").strip()
-            position  = row.get("Position", "").strip().capitalize()
-            amount    = row.get("Amount ($)", 0)
-            rationale = row.get("Rationale", "").strip()
-            source    = row.get("Source", "").strip()
-
-            hedge_block = f"""
-            <div style="background:#1e293b;padding:12px;border-radius:10px;margin-bottom:10px;color:#f1f5f9">
-                <b>{ticker} ({position})</b> — <span style="color:#22d3ee">${amount:,.0f}</span><br>
-                {rationale}
-            """
-
-            # If source is a URL, add a link
-            if re.match(r"^https?://", source):
-                hedge_block += f"""<br><a href="{source}" target="_blank" style="color:#60a5fa;">Source ↗</a>"""
-
-            hedge_block += "</div>"
-            st.markdown(hedge_block, unsafe_allow_html=True)
-
+        render_rationale(hedge_df)  
 
 # ─────────────────────────── OPTIONAL CHARTS ─────────────────────────
 if show_charts:
