@@ -223,6 +223,9 @@ if st.session_state.portfolio:
 else:
     st.warning("No tickers added yet.")
 
+portfolio = st.session_state.portfolio
+
+
 if not portfolio:
     st.error("Enter at least one ticker to continue."); st.stop()
 
