@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re, textwrap, requests
 from typing import List
-
+import requests
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -135,6 +135,14 @@ def clean_md(md: str) -> str:
     md = re.sub(r"(\d)(?=[A-Za-z])", r"\1 ", md)
     return md.replace("*", "").replace("_", "")
 
+
+@st.cache_data(ttl=3600)
+def search_tickers(query):
+    url = f"https://query1.finance.yahoo.com/v1/finance/search?q={query}"
+    resp = requests.get(url)
+    results = resp.json().get("quotes", [])
+    return [f"{r['symbol']} – {r['shortname']}" for r in results if "shortname" in r]
+
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_prices(tickers: List[str], period="2d"):
     df = yf.download(tickers, period=period, progress=False)["Close"]
@@ -181,9 +189,40 @@ with st.sidebar.expander("⚙️  Settings"):
 show_charts = st.sidebar.checkbox("📈  Show compar-chart", value=False)
 
 # ───────────────────────────── PORTFOLIO UI ──────────────────────────
-raw = st.text_input("Tickers you hold (comma-separated)", ", ".join(st.session_state.portfolio))
-portfolio = [t.strip().upper() for t in raw.split(",") if t.strip()]
-st.session_state.portfolio = portfolio
+# ⬇️ NEW ticker search & autocomplete with live API results
+import requests
+
+@st.cache_data(ttl=3600)
+def search_tickers(query):
+    url = f"https://query1.finance.yahoo.com/v1/finance/search?q={query}"
+    try:
+        resp = requests.get(url, timeout=5)
+        results = resp.json().get("quotes", [])
+        return [f"{r['symbol']} – {r.get('shortname', r.get('longname', ''))}" for r in results if "symbol" in r]
+    except Exception as e:
+        return []
+
+# Interactive ticker search section
+st.markdown("#### Add a stock/ETF to your portfolio")
+query = st.text_input("🔎 Search for ticker by name or symbol (e.g., 'Microsoft', 'AAPL')", "")
+
+if query:
+    options = search_tickers(query)
+    if options:
+        selected = st.selectbox("Choose from results", options, key="ticker_select")
+        ticker_symbol = selected.split("–")[0].strip()
+        if st.button("➕ Add to portfolio"):
+            if ticker_symbol not in st.session_state.portfolio:
+                st.session_state.portfolio.append(ticker_symbol)
+    else:
+        st.warning("No matching tickers found.")
+
+if st.session_state.portfolio:
+    st.markdown("#### Current Portfolio")
+    st.markdown("".join(f"<span class='chip'>{t}</span>" for t in st.session_state.portfolio), unsafe_allow_html=True)
+else:
+    st.warning("No tickers added yet.")
+
 if not portfolio:
     st.error("Enter at least one ticker to continue."); st.stop()
 
