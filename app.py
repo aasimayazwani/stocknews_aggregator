@@ -281,6 +281,7 @@ ticker_df = pd.DataFrame({
 }).sort_values("Amount", ascending=False)
 
 # Add human-readable labels
+ticker_df["Amount"] = ticker_df["Amount"].fillna(0)  # <-- Add this
 ticker_df["Label"] = ticker_df["Ticker"] + " ($" + ticker_df["Amount"].round(0).astype(int).astype(str) + ")"
 
 # Show the pie chart
