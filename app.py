@@ -601,7 +601,7 @@ if st.button("Suggest strategy", type="primary"):
             user_df["Ticker"] = user_df["Ticker"].astype(str)
 
             # Unified columns
-            cols = ["Ticker", "Position", "Amount ($)", "% of Portfolio", "Price", "Δ 1d %", "Rationale", "Source"]
+            cols = ["Ticker", "Position", "Amount ($)", "% of Portfolio", "Price", "Δ 1d %", "Source"]
             df = df[cols]
             user_df = user_df[cols]
 
