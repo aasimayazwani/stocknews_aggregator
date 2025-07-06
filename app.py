@@ -393,24 +393,23 @@ with st.sidebar.expander("🔮  Quarterly outlook"):
     else:
         st.markdown(f"<div class='card'>{st.session_state.outlook_md}</div>", unsafe_allow_html=True)
 
-# ─────────────────────────── USER PROFILING ───────────────────────────
-st.markdown("### 🧑‍💼 Investor Profile")
 
-experience_level = st.radio(
-    "What is your investing experience?",
-    ["Beginner", "Intermediate", "Expert"],
-    horizontal=True,
+# investor profile
+# ▶️  right after st.sidebar.expander("⚙️  Settings"):
+with st.sidebar.expander("🧑‍💼  Investor profile", expanded=True):
+    experience_level   = st.radio("Experience",   ["Beginner", "Intermediate", "Expert"])
+    explanation_pref   = st.radio("Detail level", ["Just the strategy", "Explain the reasoning", "Both"])
+
+# 🔄  Store & show sticky pill
+st.session_state.experience_level  = experience_level
+st.session_state.explanation_pref  = explanation_pref
+st.sidebar.markdown(
+    f"<div style='margin-top:6px;padding:4px 8px;border-radius:12px;"
+    f"background:#334155;color:#f8fafc;display:inline-block;font-size:13px;'>"
+    f"{experience_level} • {explanation_pref}</div>",
+    unsafe_allow_html=True,
 )
 
-explanation_pref = st.radio(
-    "How much explanation do you want in the hedge strategy?",
-    ["Just the strategy", "Explain the reasoning", "Both"],
-    horizontal=True,
-)
-
-# Save to session state
-st.session_state.experience_level = experience_level
-st.session_state.explanation_pref = explanation_pref
 
 # ─────────────────────────── STRATEGY DESIGNER ───────────────────────
 st.markdown("### 📝  Strategy Designer")
