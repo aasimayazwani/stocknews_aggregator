@@ -600,19 +600,28 @@ if st.button("Suggest strategy", type="primary"):
             user_df["Rationale"] = "—"
             user_df["Ticker"] = user_df["Ticker"].astype(str)
 
-            # Unified columns
-            cols = ["Ticker", "Position", "Amount ($)", "% of Portfolio", "Price", "Δ 1d %", "Source"]
-            df = df[cols]
-            user_df = user_df[cols]
+                    # 🔄 Align columns for merging
+            user_cols  = ["Ticker", "Position", "Amount ($)", "% of Portfolio", "Price", "Δ 1d %", "Source"]
+            hedge_cols = user_cols + ["Rationale"]
 
-            # 🧠 Store both separately in session state
-            st.session_state.strategy_df = df
+            user_df = user_df[user_cols]
+            df = df[hedge_cols]
+
+            # Add placeholder rationale to user_df for consistent merging
+            user_df["Rationale"] = "—"
+
+            # Final column ordering
+            final_cols = hedge_cols  # same as user_cols + "Rationale"
+            user_df = user_df[final_cols]
+            df = df[final_cols]
+
+            # ✅ Store in session state
             st.session_state.user_df = user_df
+            st.session_state.strategy_df = df
 
-            # (Optional) Combine later only when needed
+            # 📌 Combine for final rendering (if needed)
             combined_df = pd.concat([user_df, df], ignore_index=True)
             st.session_state.combined_df = combined_df
-
 
             # ✅ Guard in case data becomes stale or corrupted
             if combined_df.empty:
