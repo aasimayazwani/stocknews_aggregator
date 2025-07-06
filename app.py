@@ -226,6 +226,17 @@ with st.sidebar.expander("⚙️  Settings"):
     if st.button("🧹  Clear chat history"):  st.session_state.history = []
     if st.button("🗑️  Clear portfolio"):    st.session_state.portfolio = []
 
+with st.sidebar.expander("🕒 Investment settings", expanded=True):
+    primary = st.selectbox("🎯 Focus stock", st.session_state.portfolio, 0)
+    horizon = st.slider("⏳ Time horizon (months)", 1, 24, 6)
+
+show_charts = st.sidebar.checkbox("📈  Show compar-chart", value=False)
+
+# 🎯 basket computation moved below
+others  = [t for t in st.session_state.portfolio if t != primary]
+basket  = [primary] + others
+
+
 show_charts = st.sidebar.checkbox("📈  Show compar-chart", value=False)
 
 # ───────────────────────────── PORTFOLIO UI ──────────────────────────
@@ -426,7 +437,7 @@ st.markdown("### 📝  Strategy Designer")
 #goal         = st.selectbox("Positioning goal", ["Long", "Short", "Hedged", "Neutral"])
 #avoid_sym    = st.text_input("Hedge / avoid ticker", primary)
 #capital      = st.number_input("Capital (USD)", 1000, 1_000_000, 10_000, 1000)
-horizon      = st.slider("Time horizon (months)", 1, 24, 6)
+#horizon      = st.slider("Time horizon (months)", 1, 24, 6)
 
 with st.expander("⚖️  Risk controls"):
     beta_rng  = st.slider("Beta match band", 0.5, 1.5, (0.8, 1.2), 0.05)
