@@ -139,9 +139,16 @@ def clean_md(md: str) -> str:
 @st.cache_data(ttl=3600)
 def search_tickers(query):
     url = f"https://query1.finance.yahoo.com/v1/finance/search?q={query}"
-    resp = requests.get(url)
-    results = resp.json().get("quotes", [])
-    return [f"{r['symbol']} – {r['shortname']}" for r in results if "shortname" in r]
+    try:
+        resp = requests.get(url, timeout=5)
+        results = resp.json().get("quotes", [])
+        results = sorted(results, key=lambda r: r.get("score", 0), reverse=True)
+        return [
+            f"{r['symbol']} – {r.get('shortname') or r.get('longname', '')}"
+            for r in results if "symbol" in r
+        ]
+    except Exception:
+        return []
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_prices(tickers: List[str], period="2d"):
