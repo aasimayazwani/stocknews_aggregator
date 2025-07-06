@@ -19,30 +19,92 @@ st.set_page_config(page_title="Strategy Chatbot", layout="wide")
 st.markdown(
     """
     <style>
-      .card{background:#1e1f24;padding:18px;border-radius:12px;margin-bottom:18px;}
-      .chip{display:inline-block;margin:0 6px 6px 0;padding:4px 10px;border-radius:14px;
-            background:#33415588;color:#f1f5f9;font-weight:600;font-size:13px;}
-      .metric{font-size:18px;font-weight:600;margin-bottom:2px;}
-      .metric-small{font-size:14px;}
-      label{font-weight:600;font-size:0.88rem;}
-    .checkbox-label {
+      /* General card styling */
+      .card {
+        background: #1e1f24;
+        padding: 18px;
+        border-radius: 12px;
+        margin-bottom: 18px;
+      }
+
+      /* Ticker chip badge */
+      .chip {
+        display: inline-block;
+        margin: 0 6px 6px 0;
+        padding: 4px 10px;
+        border-radius: 14px;
+        background: #33415588;
+        color: #f1f5f9;
+        font-weight: 600;
+        font-size: 13px;
+      }
+
+      /* Metrics (price % changes) */
+      .metric {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 2px;
+      }
+
+      .metric-small {
+        font-size: 14px;
+      }
+
+      /* All labels (inputs, sliders, etc) */
+      label {
+        font-weight: 600;
+        font-size: 0.88rem;
+      }
+
+      /* Risk checkbox label container */
+      .checkbox-label {
         display: inline-flex;
         align-items: center;
         font-size: 14px;
         font-weight: 500;
-    }
-    .checkbox-label a {
+      }
+
+      .checkbox-label a {
         margin-left: 8px;
         color: #60a5fa;
         text-decoration: none;
-    }
-    .checkbox-label a:hover {
+        font-size: 13px;
+      }
+
+      .checkbox-label a:hover {
         text-decoration: underline;
-    }
+      }
+
+      /* Risk card (surrounds each checkbox + source) */
+      .risk-card {
+        background-color: #1f2937;
+        border-radius: 10px;
+        padding: 12px 16px;
+        margin: 8px 0;
+        color: #f8fafc;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 0 0 1px #33415544;
+        transition: background 0.2s ease-in-out;
+      }
+
+      .risk-card:hover {
+        background-color: #273449;
+      }
+
+      /* Optional: icon next to source */
+      .risk-card i {
+        font-style: normal;
+        font-size: 13px;
+        color: #60a5fa;
+        margin-left: 6px;
+      }
     </style>
     """,
     unsafe_allow_html=True,
 )
+
 st.title("🎯  Equity Strategy Assistant")
 
 # ─────────────────────────────── STATE ────────────────────────────────
@@ -152,19 +214,35 @@ st.markdown("Un-check any headline you **do not** want the LLM to consider:")
 
 # Store selected risks in checkboxes instead of multiselect
 selected_risks = []
-cols = st.columns(2)
+
+# Dummy URL generation if none available
+risk_links = {
+    r: f"https://www.google.com/search?q={primary}+{r.replace(' ', '+')}" for r in risk_list
+}
+
+# Track checkbox states with session state
 for i, risk in enumerate(risk_list):
-    with cols[i % 2]:
-        checked = st.checkbox(
-            f"✅ {risk}", value=True, key=f"risk_{i}"
-        )
-        if checked:
-            selected_risks.append(risk)
-        st.markdown(
-            f"<a href='{risk_links[risk]}' target='_blank' style='font-size:12px;'>"
-            f"<i>ℹ️ Source</i></a>",
-            unsafe_allow_html=True,
-        )
+    checkbox_key = f"risk_checkbox_{i}"
+    if checkbox_key not in st.session_state:
+        st.session_state[checkbox_key] = True  # default is checked
+
+    # HTML rendering of the full risk card
+    risk_html = f"""
+    <div class='risk-card'>
+      <label class='checkbox-label'>
+        <input type='checkbox' id='{checkbox_key}' 
+               onclick="fetch('{checkbox_key}', this.checked)"
+               {'checked' if st.session_state[checkbox_key] else ''}>
+        {risk}
+        <a href='{risk_links[risk]}' target='_blank'>ℹ️</a>
+      </label>
+    </div>
+    """
+    st.markdown(risk_html, unsafe_allow_html=True)
+    if st.session_state[checkbox_key]:
+        selected_risks.append(risk)
+
+#st.session_state.risk_ignore = [r for r in risk_list if r not in selected_risks]
 
 # Update exclusion list
 st.session_state.risk_ignore = [r for r in risk_list if r not in selected_risks]
