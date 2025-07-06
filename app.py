@@ -515,10 +515,77 @@ if st.button("Suggest strategy", type="primary"):
 
     # 3.  Clean & show ----------------------------------------------------------
     plan_md = clean_md(raw_md)
+    
+        # Extract plan sections
     plan_md_main = re.sub(r"### Residual Risks.*", "", plan_md, flags=re.I | re.S)
-
     st.subheader("📌 Suggested strategy")
-    st.markdown(plan_md_main, unsafe_allow_html=True)
+
+    # Instead of showing plan_md_main directly, parse & integrate the table
+    md_lines = plan_md_main.splitlines()
+    table_lines = [line for line in md_lines if '|' in line and not line.startswith('###')]
+
+    if len(table_lines) >= 3:
+        try:
+            import io
+
+            # STEP 1: Parse markdown table
+            table_str = '\n'.join(table_lines)
+            df = pd.read_csv(io.StringIO(table_str), sep='|')
+            df.columns = [c.strip() for c in df.columns]
+            df = df.dropna(subset=['Ticker', 'Amount ($)'])
+
+            # Clean amounts
+            df["Amount ($)"] = (
+                df["Amount ($)"]
+                .astype(str)
+                .str.replace("$", "")
+                .str.replace(",", "")
+                .str.extract(r"(\d+\.?\d*)")[0]
+                .astype(float)
+            )
+
+            df["Price"] = "_n/a_"
+            df["Δ 1d %"] = "_n/a_"
+            df["Source"] = "Suggested hedge"
+            df = df[["Ticker", "Position", "Amount ($)", "Price", "Δ 1d %", "Rationale", "Source"]]
+
+            # STEP 2: Combine with user's portfolio
+            user_df = editor_df.copy()
+            user_df["Position"] = "Long"
+            user_df["Source"] = "User portfolio"
+            user_df["Rationale"] = "—"
+            user_df["Ticker"] = user_df["Ticker"].astype(str)
+            user_df = user_df[["Ticker", "Position", "Amount ($)", "Price", "Δ 1d %", "Rationale", "Source"]]
+
+            # STEP 3: Merge tables
+            combined_df = pd.concat([user_df, df], ignore_index=True)
+
+            st.dataframe(combined_df, use_container_width=True)
+
+            st.markdown("### 📊 Post-Hedge Allocation Overview")
+            pie_df = combined_df.copy()
+            pie_df["Label"] = pie_df["Ticker"] + " (" + pie_df["Position"] + ")"
+            pie_df["Amount"] = pie_df["Amount ($)"]
+            st.plotly_chart(
+                px.pie(
+                    pie_df,
+                    names="Label",
+                    values="Amount",
+                    title="Post-Hedge Portfolio",
+                    hole=0.3
+                ).update_traces(textinfo="label+percent"),
+                use_container_width=True
+            )
+
+        except Exception as e:
+            st.warning(f"Could not parse or merge hedge table: {e}")
+
+    # Render summary only after the table
+    summary_match = re.search(r"### Summary(.*?)###", plan_md, flags=re.S)
+    if summary_match:
+        st.markdown("### 📋 Strategy Summary")
+        st.markdown(summary_match.group(1).strip(), unsafe_allow_html=True)
+
 
     # 4.  Optionally pull out Residual Risks (to highlight in a card) ----------
     match = re.search(r"### Residual Risks.*", plan_md, flags=re.I | re.S)
