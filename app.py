@@ -138,7 +138,6 @@ def clean_md(md: str) -> str:
 
 def fallback_ticker_lookup(name: str, model_name: str = "gpt-3.5-turbo") -> str:
     prompt = f"What is the stock ticker symbol for the publicly traded company '{name}'?"
-
     raw = ask_openai(
         model=model_name,
         system_prompt="You are a financial assistant that returns only the correct stock ticker symbol.",
@@ -149,14 +148,19 @@ def fallback_ticker_lookup(name: str, model_name: str = "gpt-3.5-turbo") -> str:
     match = re.search(r"\b[A-Z]{2,5}\b", raw.strip())
     return match.group(0) if match else ""
 
+
 @st.cache_data(ttl=3600)
 def search_tickers(query: str) -> List[str]:
-    url = f"https://query1.finance.yahoo.com/v1/finance/search?q={query}"
+    from urllib.parse import quote
+    query_clean = query.strip().lower()
+    url = f"https://query1.finance.yahoo.com/v1/finance/search?q={quote(query_clean)}"
+
     try:
         resp = requests.get(url, timeout=5)
-        results = resp.json().get("quotes", [])
-        results = sorted(results, key=lambda r: r.get("score", 0), reverse=True)
+        if resp.status_code != 200:
+            return []
 
+        results = resp.json().get("quotes", [])
         tickers = []
         for r in results:
             symbol = r.get("symbol", "")
@@ -164,15 +168,16 @@ def search_tickers(query: str) -> List[str]:
             if symbol and name:
                 tickers.append(f"{symbol} – {name}")
 
-        # ✅ If no good matches found, fallback to GPT
-        if not tickers and len(query.strip()) > 2:
-            fallback = fallback_ticker_lookup(query)
+        # Fallback: use GPT if nothing came back
+        if not tickers and len(query_clean) >= 3:
+            fallback = fallback_ticker_lookup(query_clean)
             if fallback:
                 tickers.append(f"{fallback} – (GPT suggested)")
 
         return tickers
     except Exception:
         return []
+
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_prices(tickers: List[str], period="2d"):
