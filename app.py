@@ -265,15 +265,6 @@ st.session_state.alloc_df = (
       .sort_values("Amount ($)", ascending=False, ignore_index=True)
 )
 
-# 3. Process edits from user
-editor_df = st.data_editor(
-    st.session_state.alloc_df,
-    num_rows="dynamic",
-    use_container_width=True,
-    key="alloc_editor",
-    hide_index=True,
-)
-
 # 4. Validate and clean user edits
 clean_df = (
     editor_df
