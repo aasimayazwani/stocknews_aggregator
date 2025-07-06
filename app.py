@@ -450,10 +450,6 @@ with st.expander("⚖️  Risk controls"):
 if st.button("Suggest strategy", type="primary"):
     # 1.  Build prompt ----------------------------------------------------------
     ignored = "; ".join(st.session_state.risk_ignore) or "None"
-    risk_string = ", ".join(risk_list) or "None"
-    alloc_str = "; ".join(
-        f"{k}: ${v:,.0f}" for k, v in st.session_state.portfolio_alloc.items()
-    ) or "None provided"
     total_capital = sum(st.session_state.portfolio_alloc.values())
     risk_string = ", ".join(risk_list) or "None"
     alloc_str = "; ".join(
@@ -538,57 +534,53 @@ if st.button("Suggest strategy", type="primary"):
 
     if len(table_lines) >= 3:
         try:
+            # STEP 1: Parse markdown table
             table_str = '\n'.join(table_lines)
             df = pd.read_csv(io.StringIO(table_str), sep='|')
             df.columns = [c.strip() for c in df.columns]
             df = df.dropna(subset=['Ticker', 'Amount ($)'])
 
-            df["Amount ($)"] = df["Amount ($)"].str.replace("$", "").str.replace(",", "").astype(float)
-            df["Label"] = df["Ticker"] + " (" + df["Position"].str.strip() + ")"
-
-            port_df = pd.DataFrame({
-                "Label": [f"{k} (Long)" for k in st.session_state.portfolio_alloc.keys()],
-                "Amount": st.session_state.portfolio_alloc.values(),
-            })
-
-            hedge_df = df[["Label", "Amount ($)"]].rename(columns={"Amount ($)": "Amount"})
-
-            col1, col2 = st.columns(2)
-            with col1:
-                st.plotly_chart(go.Figure(
-                    data=[go.Pie(labels=port_df["Label"], values=port_df["Amount"],
-                                hoverinfo="label+percent", textinfo="label")],
-                    layout_title_text="Current Portfolio"
-                ), use_container_width=True)
-
-            with col2:
-                st.plotly_chart(go.Figure(
-                    data=[go.Pie(labels=hedge_df["Label"], values=hedge_df["Amount"],
-                                hoverinfo="label+percent", textinfo="label")],
-                    layout_title_text="Suggested Hedge Allocation"
-                ), use_container_width=True)
-
-            # 🔄 Merge portfolio + hedge into a combined post-hedge view
-            merged_df = pd.concat([
-                port_df.copy().assign(Source="Portfolio"),
-                hedge_df.copy().assign(Source="Hedge")
-            ])
-
-            # Group by Label and sum across portfolio + hedge
-            combined_df = (
-                merged_df.groupby("Label", as_index=False)["Amount"]
-                .sum()
-                .sort_values("Amount", ascending=False)
+            # Clean and parse amounts
+            df["Amount ($)"] = (
+                df["Amount ($)"]
+                .astype(str)
+                .str.replace("$", "")
+                .str.replace(",", "")
+                .str.extract(r"(\d+\.?\d*)")[0]
+                .astype(float)
             )
+            df["Price"] = "—"
+            df["Δ 1d %"] = "—"
+            df["Source"] = "Suggested hedge"
 
-            # 🧁 Pie chart: Post-Hedge Allocation
-            st.markdown("### 🧾 Post-Hedge Allocation Overview")
+            # Reorder columns for consistency
+            df = df[["Ticker", "Position", "Amount ($)", "Price", "Δ 1d %", "Rationale", "Source"]]
 
-            combined_df["Label"] = combined_df["Label"] + " ($" + combined_df["Amount"].round(0).astype(int).astype(str) + ")"
+            # STEP 2: Extract user portfolio as DataFrame
+            user_df = editor_df.copy()
+            user_df["Position"] = "Long"
+            user_df["Source"] = "User portfolio"
+            user_df["Rationale"] = "—"
+            user_df["Ticker"] = user_df["Ticker"].astype(str)
+            user_df = user_df[["Ticker", "Position", "Amount ($)", "Price", "Δ 1d %", "Rationale", "Source"]]
+
+            # STEP 3: Merge user + strategy dataframes
+            combined_df = pd.concat([user_df, df], ignore_index=True)
+
+            st.markdown("### 🧾 Unified Portfolio + Strategy Table")
+            st.dataframe(combined_df, use_container_width=True)
+
+            # STEP 4: Pie Chart – Post-Hedge Allocation
+            pie_df = combined_df.copy()
+            pie_df["Label"] = pie_df["Ticker"] + " (" + pie_df["Position"] + ")"
+            pie_df["Amount"] = pie_df["Amount ($)"]
+
+            st.markdown("### 📊 Post-Hedge Allocation Overview")
+            pie_df["Label"] = pie_df["Label"] + " ($" + pie_df["Amount"].round(0).astype(int).astype(str) + ")"
 
             st.plotly_chart(
                 px.pie(
-                    combined_df,
+                    pie_df,
                     names="Label",
                     values="Amount",
                     title="Post-Hedge Portfolio",
@@ -597,23 +589,25 @@ if st.button("Suggest strategy", type="primary"):
                 use_container_width=True
             )
 
-            # 📊 Optional: Bar chart showing the hedge alone
+            # STEP 5: Bar Chart – Suggested Hedge Alone
             st.markdown("### 📈 Hedge Allocation Breakdown (Bar Chart)")
+
+            hedge_bar = df.copy()
+            hedge_bar["Label"] = hedge_bar["Ticker"] + " (" + hedge_bar["Position"] + ")"
 
             st.plotly_chart(
                 px.bar(
-                    hedge_df.sort_values("Amount", ascending=False),
+                    hedge_bar.sort_values("Amount ($)", ascending=False),
                     x="Label",
-                    y="Amount",
-                    text="Amount",
+                    y="Amount ($)",
+                    text="Amount ($)",
                     title="Hedge Allocation by Instrument"
                 ).update_traces(texttemplate="$%{text:.0f}", textposition="outside"),
                 use_container_width=True
             )
 
-
         except Exception as e:
-            st.warning(f"Could not render hedge allocation chart: {e}")
+            st.warning(f"Could not render unified table or charts: {e}")
 
 
 # ─────────────────────────── OPTIONAL CHARTS ─────────────────────────
