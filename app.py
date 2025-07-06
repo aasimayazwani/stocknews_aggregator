@@ -587,16 +587,23 @@ if st.button("Suggest strategy", type="primary"):
             df["Price"] = "_n/a_"
             df["Δ 1d %"] = "_n/a_"
             df["Source"] = "Suggested hedge"
+            total_amount = df["Amount ($)"].sum()
+            df["% of Portfolio"] = (df["Amount ($)"] / total_amount * 100).round(2)
             df = df[["Ticker", "Position", "Amount ($)", "Price", "Δ 1d %", "Rationale", "Source"]]
 
             # STEP 2: Combine with user's portfolio
             user_df = editor_df.copy()
             user_df["Position"] = "Long"
             user_df["Source"] = "User portfolio"
+            user_total = user_df["Amount ($)"].sum()
+            user_df["% of Portfolio"] = (user_df["Amount ($)"] / user_total * 100).round(2)
             user_df["Rationale"] = "—"
             user_df["Ticker"] = user_df["Ticker"].astype(str)
             user_df = user_df[["Ticker", "Position", "Amount ($)", "Price", "Δ 1d %", "Rationale", "Source"]]
 
+            cols = ["Ticker", "Position", "Amount ($)", "% of Portfolio", "Price", "Δ 1d %", "Rationale", "Source"]
+            df = df[cols]
+            user_df = user_df[cols]
             # STEP 3: Merge tables
             combined_df = pd.concat([user_df, df], ignore_index=True)
 
