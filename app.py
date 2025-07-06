@@ -227,18 +227,18 @@ with st.sidebar.expander("⚙️  Settings"):
     if st.button("🗑️  Clear portfolio"):    st.session_state.portfolio = []
 
 with st.sidebar.expander("📈 Add ticker to portfolio", expanded=True):
-query = st.text_input("Search (e.g. 'Apple', 'AAPL')", key="ticker_search")
+    query = st.text_input("Search (e.g. 'Apple', 'AAPL')", key="ticker_search")
 
-if query:
-    options = search_tickers(query)
-    if options:
-        selected = st.selectbox("Choose result", options, key="ticker_select")
-        ticker_symbol = selected.split("–")[0].strip()
-        if st.button("Add to portfolio"):
-            if ticker_symbol not in st.session_state.portfolio:
-                st.session_state.portfolio.append(ticker_symbol)
-    else:
-        st.warning("No matching tickers found.")
+    if query:
+        options = search_tickers(query)
+        if options:
+            selected = st.selectbox("Choose result", options, key="ticker_select")
+            ticker_symbol = selected.split("–")[0].strip()
+            if st.button("Add to portfolio"):
+                if ticker_symbol not in st.session_state.portfolio:
+                    st.session_state.portfolio.append(ticker_symbol)
+        else:
+            st.warning("No matching tickers found.")
 
 
 show_charts = st.sidebar.checkbox("📈  Show compar-chart", value=False)
