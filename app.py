@@ -14,6 +14,8 @@ from openai_client import ask_openai      # wrapper around OpenAI API
 from stock_utils import get_stock_summary # your own helper
 # ────────────────────────────────── THEME ─────────────────────────────────
 st.set_page_config(page_title="Strategy Chatbot", layout="wide")
+
+
 st.markdown(
     """
     <style>
@@ -23,6 +25,20 @@ st.markdown(
       .metric{font-size:18px;font-weight:600;margin-bottom:2px;}
       .metric-small{font-size:14px;}
       label{font-weight:600;font-size:0.88rem;}
+    .checkbox-label {
+        display: inline-flex;
+        align-items: center;
+        font-size: 14px;
+        font-weight: 500;
+    }
+    .checkbox-label a {
+        margin-left: 8px;
+        color: #60a5fa;
+        text-decoration: none;
+    }
+    .checkbox-label a:hover {
+        text-decoration: underline;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -127,13 +143,33 @@ if primary not in st.session_state.risk_cache:
         st.session_state.risk_cache[primary] = web_risk_scan(primary)
 
 risk_list = st.session_state.risk_cache[primary]
-exclude   = st.multiselect(
-    "Un-check any headline you **do not** want the LLM to consider:",
-    options=risk_list,
-    default=risk_list,
-    key="risk_select",
-)
-st.session_state.risk_ignore = [r for r in risk_list if r not in exclude]
+# Dummy mapping of risk → URL (replace with real scraping or LLM output if available)
+risk_links = {
+    r: f"https://www.google.com/search?q={primary}+{r.replace(' ', '+')}" for r in risk_list
+}
+
+st.markdown("Un-check any headline you **do not** want the LLM to consider:")
+
+# Store selected risks in checkboxes instead of multiselect
+selected_risks = []
+cols = st.columns(2)
+for i, risk in enumerate(risk_list):
+    with cols[i % 2]:
+        checked = st.checkbox(
+            f"✅ {risk}", value=True, key=f"risk_{i}"
+        )
+        if checked:
+            selected_risks.append(risk)
+        st.markdown(
+            f"<a href='{risk_links[risk]}' target='_blank' style='font-size:12px;'>"
+            f"<i>ℹ️ Source</i></a>",
+            unsafe_allow_html=True,
+        )
+
+# Update exclusion list
+st.session_state.risk_ignore = [r for r in risk_list if r not in selected_risks]
+
+#st.session_state.risk_ignore = [r for r in risk_list if r not in exclude]
 
 # ───────────────────────── SIDEBAR – OUTLOOK ─────────────────────────
 with st.sidebar.expander("🔮  Quarterly outlook"):
