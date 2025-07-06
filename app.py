@@ -401,6 +401,25 @@ with st.sidebar.expander("🔮  Quarterly outlook"):
     else:
         st.markdown(f"<div class='card'>{st.session_state.outlook_md}</div>", unsafe_allow_html=True)
 
+# ─────────────────────────── USER PROFILING ───────────────────────────
+st.markdown("### 🧑‍💼 Investor Profile")
+
+experience_level = st.radio(
+    "What is your investing experience?",
+    ["Beginner", "Intermediate", "Expert"],
+    horizontal=True,
+)
+
+explanation_pref = st.radio(
+    "How much explanation do you want in the hedge strategy?",
+    ["Just the strategy", "Explain the reasoning", "Both"],
+    horizontal=True,
+)
+
+# Save to session state
+st.session_state.experience_level = experience_level
+st.session_state.explanation_pref = explanation_pref
+
 # ─────────────────────────── STRATEGY DESIGNER ───────────────────────
 st.markdown("### 📝  Strategy Designer")
 #sector_guess = yf.Ticker(primary).info.get("sector", "")
@@ -428,36 +447,54 @@ if st.button("Suggest strategy", type="primary"):
         f"{k}: ${v:,.0f}" for k, v in st.session_state.portfolio_alloc.items()
     ) or "None provided"
 
+    # Build user-style guidance from profile
+    experience_note = {
+        "Beginner": "Use simple, jargon-free language appropriate for a retail investor.",
+        "Intermediate": "Use moderate technical terms and explain key terms when needed.",
+        "Expert": "Use professional investment language without oversimplification.",
+    }[st.session_state.experience_level]
+
+    explanation_note = {
+        "Just the strategy": "Skip all explanations — just give the hedge table and summary.",
+        "Explain the reasoning": "For each hedge, explain the logic behind the choice.",
+        "Both": "Include the full hedge table, and explain the rationale for each entry in clear terms.",
+    }[st.session_state.explanation_pref]
+
+    # Main prompt with guidance embedded
     prompt = textwrap.dedent(f"""
         Act as a **hedging strategist**.
 
         • **Basket**: {', '.join(basket)}
         • **Current allocation**: {alloc_str}
-        • **Total capital** (based on portfolio table): ${total_capital:,.0f}
+        • **Total capital**: ${total_capital:,.0f}
         • **Horizon**: {horizon} months
         • **Beta band**: {beta_rng[0]:.2f}–{beta_rng[1]:.2f}
         • **Stop-loss**: {stop_loss} %
         • **Detected headline risks** for {primary}: {risk_string}
-        • **Ignore** the following risks when constructing the hedge: {ignored}
+        • **Ignore** the following risks: {ignored}
 
-        Your task is to design a tactical hedge that offsets risk while preserving exposure to high-conviction positions.
+        ### Investor profile
+        Experience level: {st.session_state.experience_level}
+        Preferences: {st.session_state.explanation_pref}
+        Style guidance: {experience_note} {explanation_note}
 
-        For each hedge recommendation, include:
-        – 1–2 ticker symbols (e.g., VIXY, PSQ, XLF puts)  
-        – A rationale linking the hedge to specific risks  
-        – A reliable source (URL)
+        ### Instructions:
+        Design a tactical hedge to offset risk while preserving conviction positions.
 
-        **Return EXACTLY in this markdown order**:
+        For each hedge, include 1–2 **tickers** (ETF, inverse, option proxy, or macro exposure).
 
-        1️⃣ A table (markdown pipe format) with columns **Ticker | Position | Amount ($) | Rationale | Source**  
-        – Put the full clickable URL in the *Source* column of each row.
+        Return **only markdown**, in this exact format:
 
-        2️⃣ `### Summary` – 2–3 plain sentences (max 300 chars) – NO italics/bold inside.
+        1️⃣ A table with columns: **Ticker | Position | Amount ($) | Rationale | Source**  
+        – Use a real clickable URL in the *Source* column.
 
-        3️⃣ `### Residual Risks` – a numbered list; each bullet ≤ 25 words and **MUST end with a source URL in parentheses**.
+        2️⃣ `### Summary`: a short paragraph (max 300 chars) summarizing the strategy.
 
-        Do not wrap anything in code-fences.
+        3️⃣ `### Residual Risks`: a numbered list (≤ 25 words each), each ending with a **source URL**.
+
+        Do NOT wrap any output in code blocks or quotes.
     """).strip()
+
 
 
 
