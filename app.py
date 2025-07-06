@@ -601,24 +601,20 @@ if st.button("Suggest strategy", type="primary"):
             user_df["Ticker"] = user_df["Ticker"].astype(str)
 
                     # 🔄 Align columns for merging
+            # Define base columns
             user_cols  = ["Ticker", "Position", "Amount ($)", "% of Portfolio", "Price", "Δ 1d %", "Source"]
             hedge_cols = user_cols + ["Rationale"]
 
-            user_df = user_df[user_cols]
+            # 1️⃣ Keep hedge_df as is (includes rationale)
             df = df[hedge_cols]
 
-            # Add placeholder rationale to user_df for consistent merging
-            user_df["Rationale"] = "—"
+            # 2️⃣ Prepare user_df (exclude rationale from display)
+            user_df = user_df[user_cols].copy()
 
-            # Final column ordering
-            # Drop rationale from user_df for visual clarity (optional)
-            user_df = user_df[user_cols]  # <- no "Rationale" in user view
-            df = df[hedge_cols]           # <- keep rationale in hedge
-
-            # Add blank rationale column to user_df just for alignment (but hidden)
+            # 3️⃣ Add empty rationale column for alignment only
             user_df["Rationale"] = ""
 
-            # Final mergeable column order
+            # 4️⃣ Final unified ordering
             final_cols = hedge_cols
             user_df = user_df[final_cols]
             df = df[final_cols]
