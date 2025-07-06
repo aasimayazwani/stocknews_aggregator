@@ -265,9 +265,9 @@ st.session_state.alloc_df = (
       .sort_values("Amount ($)", ascending=False, ignore_index=True)
 )
 
-# 4. Validate and clean user edits
+# 3–4. Clean and validate input from session state
 clean_df = (
-    editor_df
+    st.session_state.alloc_df
       .dropna(subset=["Ticker"])
       .query("Ticker != ''")
       .drop_duplicates(subset=["Ticker"])
@@ -281,31 +281,30 @@ prices_df = fetch_prices(tickers, period="2d")
 if not prices_df.empty:
     last = prices_df.iloc[-1]
     prev = prices_df.iloc[-2]
-
     clean_df["Price"] = last.reindex(tickers).round(2).values
     clean_df["Δ 1d %"] = ((last - prev) / prev * 100).reindex(tickers).round(2).values
 else:
     clean_df["Price"] = 0.0
     clean_df["Δ 1d %"] = 0.0
 
-# 6. Show updated table with Price & Δ 1d % (read-only)
+# 6. Show a single data editor (with price columns read-only)
 editor_df = st.data_editor(
     clean_df,
     disabled={"Price": True, "Δ 1d %": True},
     num_rows="dynamic",
     use_container_width=True,
-    key="alloc_editor_final",
+    key="alloc_editor",  # single key now
     hide_index=True,
 )
 
-# 7. Persist state
+# 7. Persist edits back to session state
 st.session_state.alloc_df = editor_df
 st.session_state.portfolio = editor_df["Ticker"].tolist()
 st.session_state.portfolio_alloc = dict(
     zip(editor_df["Ticker"], editor_df["Amount ($)"])
 )
 
-# 8. Create pie data
+# 8. Create pie data (used conditionally later)
 ticker_df = pd.DataFrame({
     "Ticker": list(st.session_state.portfolio_alloc.keys()),
     "Amount": list(st.session_state.portfolio_alloc.values())
@@ -313,7 +312,7 @@ ticker_df = pd.DataFrame({
 
 ticker_df["Amount"] = ticker_df["Amount"].fillna(0)
 ticker_df["Label"] = (
-    ticker_df["Ticker"] + " ($" + 
+    ticker_df["Ticker"] + " ($" +
     ticker_df["Amount"].round(0).astype(int).astype(str) + ")"
 )
 
