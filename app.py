@@ -371,11 +371,11 @@ with st.sidebar.expander("🔮  Quarterly outlook"):
 
 # ─────────────────────────── STRATEGY DESIGNER ───────────────────────
 st.markdown("### 📝  Strategy Designer")
-sector_guess = yf.Ticker(primary).info.get("sector", "")
-sector_in    = st.text_input("Sector", sector_guess)
+#sector_guess = yf.Ticker(primary).info.get("sector", "")
+#sector_in    = st.text_input("Sector", sector_guess)
 #goal         = st.selectbox("Positioning goal", ["Long", "Short", "Hedged", "Neutral"])
 #avoid_sym    = st.text_input("Hedge / avoid ticker", primary)
-capital      = st.number_input("Capital (USD)", 1000, 1_000_000, 10_000, 1000)
+#capital      = st.number_input("Capital (USD)", 1000, 1_000_000, 10_000, 1000)
 horizon      = st.slider("Time horizon (months)", 1, 24, 6)
 
 with st.expander("⚖️  Risk controls"):
@@ -390,6 +390,7 @@ if st.button("Suggest strategy", type="primary"):
     alloc_str = "; ".join(
         f"{k}: ${v:,.0f}" for k, v in st.session_state.portfolio_alloc.items()
     ) or "None provided"
+    total_capital = sum(st.session_state.portfolio_alloc.values())
     prompt = textwrap.dedent(f"""
         Act as a **hedging strategist**.
 
