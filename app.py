@@ -263,38 +263,30 @@ st.session_state.portfolio_alloc = dict(
     zip(clean_df["Ticker"], clean_df["Amount ($)"])
 )
 
-# ─────────────────── SECTOR EXPOSURE BREAKDOWN ───────────────────
-st.markdown("### 🧠 Sector Exposure Summary")
+st.markdown("### 🧾 Portfolio Allocation by Ticker")
 
-# 1. Lookup sector for each ticker
-sector_map = {}
-for tick in st.session_state.portfolio:
-    try:
-        info = yf.Ticker(tick).info
-        sector = info.get("sector", "Unknown")
-        sector_map[tick] = sector
-    except Exception:
-        sector_map[tick] = "Unknown"
-
-# 2. Aggregate allocations by sector
-alloc_df = pd.DataFrame({
+ticker_df = pd.DataFrame({
     "Ticker": list(st.session_state.portfolio_alloc.keys()),
     "Amount": list(st.session_state.portfolio_alloc.values())
-})
-alloc_df["Sector"] = alloc_df["Ticker"].map(sector_map)
-sector_df = (
-    alloc_df.groupby("Sector")["Amount"].sum()
-    .sort_values(ascending=False)
-    .reset_index()
-)
-sector_df["%"] = (sector_df["Amount"] / sector_df["Amount"].sum() * 100).round(1)
+}).sort_values("Amount", ascending=False)
 
-# 3. Show in table and chart
-st.dataframe(sector_df.rename(columns={"%": "Allocation %"}), use_container_width=True)
+st.dataframe(ticker_df, use_container_width=True)
+
+# Enhanced label with both ticker and amount
+ticker_df["Label"] = ticker_df["Ticker"] + " ($" + ticker_df["Amount"].round(0).astype(int).astype(str) + ")"
+
 st.plotly_chart(
-    px.pie(sector_df, names="Sector", values="Amount", title="Sector Breakdown", hole=0.4),
+    px.pie(
+        ticker_df,
+        names="Label",
+        values="Amount",
+        title="Current Portfolio Allocation",
+        hole=0.3
+    ).update_traces(textinfo="label+percent"),
     use_container_width=True
 )
+
+
 
 portfolio = st.session_state.portfolio
 
