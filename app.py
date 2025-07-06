@@ -247,7 +247,6 @@ basket  = [primary] + others
 # ───────────────────────────── PORTFOLIO UI ──────────────────────────
 # ⬇️ NEW ticker search & autocomplete with live API results
 
-
 # ─────────────────── 💰 POSITION-SIZE EDITOR ────────────────────
 st.markdown("### 💰 Position sizes Editable")
 
@@ -259,97 +258,89 @@ if "alloc_df" not in st.session_state:
         "Amount ($)": [10_000] * len(tickers)
     })
 
-# 2. Keep only rows whose ticker is still in session_state.portfolio
+# 2. Keep only valid rows
 st.session_state.alloc_df = (
     st.session_state.alloc_df
-      .query("Ticker in @st.session_state.portfolio")          # auto-drop removed tickers
+      .query("Ticker in @st.session_state.portfolio")
       .sort_values("Amount ($)", ascending=False, ignore_index=True)
 )
 
-# 3. Show an editable, sortable table   (Streamlit ≥1.29)
+# 3. Process edits from user
 editor_df = st.data_editor(
     st.session_state.alloc_df,
-    num_rows="dynamic",
-    use_container_width=True,
-    key="alloc_editor",        # preserves edits between reruns
-    hide_index=True,
-)
-
-# 4. Persist edits AND detect deletions
-clean_df = (
-    editor_df
-      .dropna(subset=["Ticker"])                # empty row = deleted
-      .query("Ticker != ''")
-      .drop_duplicates(subset=["Ticker"])       # guard against accidental dups
-      .sort_values("Amount ($)", ascending=False, ignore_index=True)
-)
-
-st.session_state.alloc_df       = clean_df                      # overwrite canonical table
-st.session_state.portfolio      = clean_df["Ticker"].tolist()   # keep master list in sync
-st.session_state.portfolio_alloc = dict(
-    zip(clean_df["Ticker"], clean_df["Amount ($)"])
-)
-
-# Rebuild summary table (needed for pie chart, even if no table UI shown)
-ticker_df = pd.DataFrame({
-    "Ticker": list(st.session_state.portfolio_alloc.keys()),
-    "Amount": list(st.session_state.portfolio_alloc.values())
-}).sort_values("Amount", ascending=False)
-
-# Add human-readable labels
-ticker_df["Amount"] = ticker_df["Amount"].fillna(0)  # <-- Add this
-ticker_df["Label"] = ticker_df["Ticker"] + " ($" + ticker_df["Amount"].round(0).astype(int).astype(str) + ")"
-
-# Show the pie chart
-st.plotly_chart(
-    px.pie(
-        ticker_df,
-        names="Label",
-        values="Amount",
-        title="Current Portfolio Allocation",
-        hole=0.3
-    ).update_traces(textinfo="label+percent"),
-    use_container_width=True
-)
-
-portfolio = st.session_state.portfolio
-
-
-# ── after you compute `clean_df` ──────────────────────────────────────
-tickers = clean_df["Ticker"].tolist()
-prices_df = fetch_prices(tickers, period="2d")
-
-if not prices_df.empty:
-    last  = prices_df.iloc[-1]
-    prev  = prices_df.iloc[-2]
-
-    clean_df["Price"]     = last.reindex(tickers).values
-    clean_df["Δ 1d %"]    = (
-        (last - prev) / prev * 100
-    ).reindex(tickers).round(2).values
-
-# Mark the new cols as read-only so users can’t type over them
-editor_df = st.data_editor(
-    clean_df,
-    disabled={"Price": True, "Δ 1d %": True},
     num_rows="dynamic",
     use_container_width=True,
     key="alloc_editor",
     hide_index=True,
 )
 
-# Persist edits back into session state
-st.session_state.alloc_df       = editor_df
-st.session_state.portfolio      = editor_df["Ticker"].tolist()
+# 4. Validate and clean user edits
+clean_df = (
+    editor_df
+      .dropna(subset=["Ticker"])
+      .query("Ticker != ''")
+      .drop_duplicates(subset=["Ticker"])
+      .sort_values("Amount ($)", ascending=False, ignore_index=True)
+)
+
+# 5. Add real-time price and % change
+tickers = clean_df["Ticker"].tolist()
+prices_df = fetch_prices(tickers, period="2d")
+
+if not prices_df.empty:
+    last = prices_df.iloc[-1]
+    prev = prices_df.iloc[-2]
+
+    clean_df["Price"] = last.reindex(tickers).round(2).values
+    clean_df["Δ 1d %"] = ((last - prev) / prev * 100).reindex(tickers).round(2).values
+else:
+    clean_df["Price"] = 0.0
+    clean_df["Δ 1d %"] = 0.0
+
+# 6. Show updated table with Price & Δ 1d % (read-only)
+editor_df = st.data_editor(
+    clean_df,
+    disabled={"Price": True, "Δ 1d %": True},
+    num_rows="dynamic",
+    use_container_width=True,
+    key="alloc_editor_final",
+    hide_index=True,
+)
+
+# 7. Persist state
+st.session_state.alloc_df = editor_df
+st.session_state.portfolio = editor_df["Ticker"].tolist()
 st.session_state.portfolio_alloc = dict(
     zip(editor_df["Ticker"], editor_df["Amount ($)"])
 )
 
-# ── delete the entire 'tiles_df' block further down ──────────────────
+# 8. Create pie data
+ticker_df = pd.DataFrame({
+    "Ticker": list(st.session_state.portfolio_alloc.keys()),
+    "Amount": list(st.session_state.portfolio_alloc.values())
+}).sort_values("Amount", ascending=False)
 
+ticker_df["Amount"] = ticker_df["Amount"].fillna(0)
+ticker_df["Label"] = (
+    ticker_df["Ticker"] + " ($" + 
+    ticker_df["Amount"].round(0).astype(int).astype(str) + ")"
+)
 
-others  = [t for t in portfolio if t != primary]
-basket  = [primary] + others
+# 9. Optional pie chart toggle
+if st.checkbox("📊 Show Portfolio Pie Chart", value=False):
+    st.plotly_chart(
+        px.pie(
+            ticker_df,
+            names="Label",
+            values="Amount",
+            title="Current Portfolio Allocation",
+            hole=0.3
+        ).update_traces(textinfo="label+percent"),
+        use_container_width=True
+    )
+
+# 10. Save final list
+portfolio = st.session_state.portfolio
 
 # ────────────────────── headline-risk retrieval (cached) ─────────────────────
 if primary not in st.session_state.risk_cache:
