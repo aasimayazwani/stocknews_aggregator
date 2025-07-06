@@ -13,7 +13,7 @@ from config import DEFAULT_MODEL          # local module
 from openai_client import ask_openai      # wrapper around OpenAI API
 from stock_utils import get_stock_summary # your own helper
 # ────────────────────────────────── THEME ─────────────────────────────────
-st.set_page_config(page_title="Hedge Strategy Chatbot", layout="wide")
+st.set_page_config(page_title="Hedge Strategy Chatbot", layout="centered")
 
 st.markdown(
     """
