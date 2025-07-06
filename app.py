@@ -220,24 +220,29 @@ def web_risk_scan(ticker: str, model_name: str = DEFAULT_MODEL) -> List[str]:
         risks = [ln for ln in lines if ln]
         return risks[:5] or [f"No hedge-relevant risks identified for {ticker}."]
 
+# ─────────────────────────────── STATE ────────────────────────────────
+if "history"     not in st.session_state: st.session_state.history     = []
+if "portfolio"   not in st.session_state: st.session_state.portfolio   = ["AAPL", "MSFT"]
+if "outlook_md"  not in st.session_state: st.session_state.outlook_md  = None
+if "risk_cache"  not in st.session_state: st.session_state.risk_cache  = {}
+if "risk_ignore" not in st.session_state: st.session_state.risk_ignore = []
+
 # ────────────────────────── SIDEBAR – SETTINGS ───────────────────────
 with st.sidebar.expander("⚙️  Settings"):
     model = st.selectbox("OpenAI Model", [DEFAULT_MODEL, "gpt-4.1-mini", "gpt-4o-mini"], 0)
     if st.button("🧹  Clear chat history"):  st.session_state.history = []
     if st.button("🗑️  Clear portfolio"):    st.session_state.portfolio = []
 
+# fix duplicate ID bug by giving a key to each sidebar widget
 with st.sidebar.expander("🕒 Investment settings", expanded=True):
-    primary = st.selectbox("🎯 Focus stock", st.session_state.portfolio, 0)
-    horizon = st.slider("⏳ Time horizon (months)", 1, 24, 6)
+    primary = st.selectbox("🎯 Focus stock", st.session_state.portfolio, 0, key="focus_stock")
+    horizon = st.slider("⏳ Time horizon (months)", 1, 24, 6, key="horizon_slider")
 
-show_charts = st.sidebar.checkbox("📈  Show compar-chart", value=False)
+show_charts = st.sidebar.checkbox("📈  Show compar-chart", value=False, key="show_chart_toggle")
 
 # 🎯 basket computation moved below
 others  = [t for t in st.session_state.portfolio if t != primary]
 basket  = [primary] + others
-
-
-show_charts = st.sidebar.checkbox("📈  Show compar-chart", value=False)
 
 # ───────────────────────────── PORTFOLIO UI ──────────────────────────
 # ⬇️ NEW ticker search & autocomplete with live API results
