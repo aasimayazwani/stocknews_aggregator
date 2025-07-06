@@ -580,18 +580,28 @@ if st.button("Suggest strategy", type="primary"):
         except Exception as e:
             st.warning(f"Could not parse or merge hedge table: {e}")
 
-    # Render summary only after the table
-    summary_match = re.search(r"### Summary(.*?)###", plan_md, flags=re.S)
-    if summary_match:
-        st.markdown("### 📋 Strategy Summary")
-        st.markdown(summary_match.group(1).strip(), unsafe_allow_html=True)
+        # 🔍 📌 Hedge Strategy Rationale (dynamic, with links)
+        st.markdown("### 📌 Hedge Strategy Rationale")
 
+        hedge_only = df[df["Source"] == "Suggested hedge"]
 
-    # 4.  Optionally pull out Residual Risks (to highlight in a card) ----------
-    match = re.search(r"### Residual Risks.*", plan_md, flags=re.I | re.S)
-    if match:
-        st.subheader("⚠️ Residual Risks (quick view)")
-        st.markdown(f"<div class='card'>{match.group(0)}</div>", unsafe_allow_html=True)
+        if hedge_only.empty:
+            st.info("No hedge rationale to show.")
+        else:
+            total_hedge = hedge_only["Amount ($)"].sum()
+            st.markdown(
+                f"A total of **${total_hedge:,.0f}** was allocated to hedge instruments to mitigate key risks in the portfolio.\n\n"
+                "Below is the reasoning behind each hedge component:"
+            )
+
+            for _, row in hedge_only.iterrows():
+                rationale = row.get("Rationale", "").strip()
+                source = row.get("Source", "").strip()
+
+                if re.match(r"^https?://", source):
+                    st.markdown(f"- **{row['Ticker']}** → {rationale}  \n  ↪ [Source]({source})")
+                else:
+                    st.markdown(f"- **{row['Ticker']}** → {rationale}")
 
     # ───────────────────── PORTFOLIO vs HEDGE COMPOSITION ─────────────────────
     st.markdown("### 📊 Portfolio vs Hedge Allocation Breakdown")
