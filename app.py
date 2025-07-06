@@ -607,7 +607,7 @@ if st.button("Suggest strategy", type="primary"):
             user_df["Ticker"] = user_df["Ticker"].astype(str)
             user_df = user_df[cols]
 
-            combined_df = pd.concat([user_df, df], ignore_index=True)
+            combined_df = pd.concat([df], ignore_index=True)
 
             # ✅ Store in session state to persist across reruns
             st.session_state.strategy_df = df
