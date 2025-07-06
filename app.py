@@ -228,40 +228,50 @@ risk_links = {
 
 st.markdown("Un-check any headline you **do not** want the LLM to consider:")
 
-# Store selected risks in checkboxes instead of multiselect
+# --------------------------------------------
+# 🧠 2-Column Responsive Risk Rendering Section
+# --------------------------------------------
 selected_risks = []
 
-# Dummy URL generation if none available
+# Generate dummy source links if needed
 risk_links = {
     r: f"https://www.google.com/search?q={primary}+{r.replace(' ', '+')}" for r in risk_list
 }
 
-# Track checkbox states with session state
-for i, risk in enumerate(risk_list):
-    checkbox_key = f"risk_checkbox_{i}"
-    if checkbox_key not in st.session_state:
-        st.session_state[checkbox_key] = True  # default is checked
+# Begin the grid container
+st.markdown("<div class='risk-grid'>", unsafe_allow_html=True)
 
-    # HTML rendering of the full risk card
-    risk_html = f"""
+# Render each risk in a styled card with checkbox + source
+for i, risk in enumerate(risk_list):
+    key = f"risk_{i}"
+    # Default all to checked unless already set
+    if key not in st.session_state:
+        st.session_state[key] = True
+
+    # Maintain checked state for each
+    checked_attr = "checked" if st.session_state[key] else ""
+
+    html = f"""
     <div class='risk-card'>
-      <label class='checkbox-label'>
-        <input type='checkbox' id='{checkbox_key}' 
-               onclick="fetch('{checkbox_key}', this.checked)"
-               {'checked' if st.session_state[checkbox_key] else ''}>
-        {risk}
-        <a href='{risk_links[risk]}' target='_blank'>ℹ️</a>
+      <label for="{key}">
+        <input type="checkbox" id="{key}" name="{key}" onclick="window.dispatchEvent(new Event('input'))" {checked_attr}>
+        <span>{risk}</span>
+        <a href="{risk_links[risk]}" target="_blank">ℹ️</a>
       </label>
     </div>
     """
-    st.markdown(risk_html, unsafe_allow_html=True)
-    if st.session_state[checkbox_key]:
+    st.markdown(html, unsafe_allow_html=True)
+
+    # Track which are still selected
+    if st.session_state[key]:
         selected_risks.append(risk)
 
-#st.session_state.risk_ignore = [r for r in risk_list if r not in selected_risks]
+# End the grid
+st.markdown("</div>", unsafe_allow_html=True)
 
-# Update exclusion list
+# Update the exclusion list in session state
 st.session_state.risk_ignore = [r for r in risk_list if r not in selected_risks]
+
 
 #st.session_state.risk_ignore = [r for r in risk_list if r not in exclude]
 
