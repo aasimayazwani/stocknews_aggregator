@@ -670,24 +670,6 @@ if st.button("Suggest strategy", type="primary"):
                         use_container_width=True
                     )
 
-
-            # STEP 5: Bar Chart – Suggested Hedge Alone
-            st.markdown("### 📈 Hedge Allocation Breakdown (Bar Chart)")
-
-            hedge_bar = df.copy()
-            hedge_bar["Label"] = hedge_bar["Ticker"] + " (" + hedge_bar["Position"] + ")"
-
-            st.plotly_chart(
-                px.bar(
-                    hedge_bar.sort_values("Amount ($)", ascending=False),
-                    x="Label",
-                    y="Amount ($)",
-                    text="Amount ($)",
-                    title="Hedge Allocation by Instrument"
-                ).update_traces(texttemplate="$%{text:.0f}", textposition="outside"),
-                use_container_width=True
-            )
-
         except Exception as e:
             st.warning(f"Could not render unified table or charts: {e}")
 
