@@ -245,17 +245,7 @@ show_charts = st.sidebar.checkbox("📈  Show compar-chart", value=False)
 
 # ───────────────────────────── PORTFOLIO UI ──────────────────────────
 # ⬇️ NEW ticker search & autocomplete with live API results
-import requests
 
-@st.cache_data(ttl=3600)
-def search_tickers(query):
-    url = f"https://query1.finance.yahoo.com/v1/finance/search?q={query}"
-    try:
-        resp = requests.get(url, timeout=5)
-        results = resp.json().get("quotes", [])
-        return [f"{r['symbol']} – {r.get('shortname', r.get('longname', ''))}" for r in results if "symbol" in r]
-    except Exception as e:
-        return []
 
 # ─────────────────── 💰 POSITION-SIZE EDITOR ────────────────────
 st.markdown("### 💰 Position sizes Editable")
