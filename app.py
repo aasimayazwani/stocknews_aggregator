@@ -604,9 +604,6 @@ if st.button("Suggest strategy", type="primary"):
                 else:
                     st.markdown(f"- **{row['Ticker']}** → {rationale}")
 
-    # ───────────────────── PORTFOLIO vs HEDGE COMPOSITION ─────────────────────
-    st.markdown("### 📊 Portfolio vs Hedge Allocation Breakdown")
-
     import io
     import plotly.graph_objects as go
 
