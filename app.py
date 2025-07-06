@@ -58,7 +58,7 @@ st.markdown(
       /* Risk section grid layout */
       .risk-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
         gap: 12px;
         margin-top: 10px;
         margin-bottom: 16px;
@@ -219,18 +219,46 @@ if query:
 
 if st.session_state.portfolio:
     st.markdown("#### Current Portfolio")
-    st.markdown("".join(f"<span class='chip'>{t}</span>" for t in st.session_state.portfolio), unsafe_allow_html=True)
+    cols = st.columns(len(st.session_state.portfolio))
+    for i, t in enumerate(st.session_state.portfolio):
+        with cols[i]:
+            if st.button("❌", key=f"rm_{t}", help="Remove"):
+                st.session_state.portfolio.remove(t)
+                st.rerun()
+            st.markdown(f"<span class='chip'>{t}</span>", unsafe_allow_html=True)
 else:
-    st.warning("No tickers added yet.")
+    st.info("No tickers added yet.")
 
 portfolio = st.session_state.portfolio
 
+# ─────────────────── PORTFOLIO ALLOCATIONS ────────────────────
+st.markdown("### 💰 Position sizes")
+
+# Build a starter DataFrame (one row per ticker)
+default_df = pd.DataFrame(
+    {
+        "Ticker": portfolio,
+        "Amount ($)": [10_000] * len(portfolio)   # placeholder amount
+    }
+)
+
+# Streamlit 1.29+: editable grid
+portfolio_df = st.data_editor(
+    default_df,
+    num_rows="dynamic",
+    use_container_width=True,
+    key="alloc_editor",
+)
+
+# Persist to session state (dict: {ticker: amount})
+st.session_state.portfolio_alloc = dict(
+    zip(portfolio_df["Ticker"], portfolio_df["Amount ($)"])
+)
 
 if not portfolio:
     st.error("Enter at least one ticker to continue."); st.stop()
 
 # Chips + price tiles
-st.markdown("".join(f"<span class='chip'>{t}</span>" for t in portfolio), unsafe_allow_html=True)
 tiles_df = fetch_prices(portfolio, "2d")
 if not tiles_df.empty:
     last, prev = tiles_df.iloc[-1], tiles_df.iloc[-2]
@@ -351,11 +379,14 @@ if st.button("Suggest strategy", type="primary"):
     # 1.  Build prompt ----------------------------------------------------------
     ignored = "; ".join(st.session_state.risk_ignore) or "None"
     risk_string = ", ".join(risk_list) or "None"
-
+    alloc_str = "; ".join(
+        f"{k}: ${v:,.0f}" for k, v in st.session_state.portfolio_alloc.items()
+    ) or "None provided"
     prompt = textwrap.dedent(f"""
         Act as a **portfolio strategist**.
 
         • **Basket**: {', '.join(basket)}
+        • **Current allocation**: {alloc_str}
         • **Sector**: {sector_in}
         • **Goal**: {goal.lower()}
         • **Hedge / avoid**: {avoid_sym}
