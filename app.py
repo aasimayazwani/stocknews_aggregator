@@ -547,6 +547,50 @@ if st.button("Suggest strategy", type="primary"):
                     layout_title_text="Suggested Hedge Allocation"
                 ), use_container_width=True)
 
+            # 🔄 Merge portfolio + hedge into a combined post-hedge view
+            merged_df = pd.concat([
+                port_df.copy().assign(Source="Portfolio"),
+                hedge_df.copy().assign(Source="Hedge")
+            ])
+
+            # Group by Label and sum across portfolio + hedge
+            combined_df = (
+                merged_df.groupby("Label", as_index=False)["Amount"]
+                .sum()
+                .sort_values("Amount", ascending=False)
+            )
+
+            # 🧁 Pie chart: Post-Hedge Allocation
+            st.markdown("### 🧾 Post-Hedge Allocation Overview")
+
+            combined_df["Label"] = combined_df["Label"] + " ($" + combined_df["Amount"].round(0).astype(int).astype(str) + ")"
+
+            st.plotly_chart(
+                px.pie(
+                    combined_df,
+                    names="Label",
+                    values="Amount",
+                    title="Post-Hedge Portfolio",
+                    hole=0.3
+                ).update_traces(textinfo="label+percent"),
+                use_container_width=True
+            )
+
+            # 📊 Optional: Bar chart showing the hedge alone
+            st.markdown("### 📈 Hedge Allocation Breakdown (Bar Chart)")
+
+            st.plotly_chart(
+                px.bar(
+                    hedge_df.sort_values("Amount", ascending=False),
+                    x="Label",
+                    y="Amount",
+                    text="Amount",
+                    title="Hedge Allocation by Instrument"
+                ).update_traces(texttemplate="$%{text:.0f}", textposition="outside"),
+                use_container_width=True
+            )
+
+
         except Exception as e:
             st.warning(f"Could not render hedge allocation chart: {e}")
 
