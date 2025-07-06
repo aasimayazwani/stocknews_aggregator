@@ -314,22 +314,40 @@ st.plotly_chart(
 
 portfolio = st.session_state.portfolio
 
-# Chips + price tiles
-tiles_df = fetch_prices(portfolio, "2d")
-if not tiles_df.empty:
-    last, prev = tiles_df.iloc[-1], tiles_df.iloc[-2]
-    cols = st.columns(len(tiles_df.columns))
-    for c, sym in zip(cols, tiles_df.columns):
-        v, d = last[sym], (last[sym]-prev[sym]) / prev[sym] * 100
-        with c:
-            c.markdown(f"<div class='metric'>{sym}</div>", unsafe_allow_html=True)
-            c.markdown(f"{v:,.2f}")
-            c.markdown(
-                f"<span class='metric-small' style='color:{'lime' if d>=0 else 'tomato'}'>{d:+.2f}%</span>",
-                unsafe_allow_html=True,
-            )
 
-st.divider()
+# ── after you compute `clean_df` ──────────────────────────────────────
+tickers = clean_df["Ticker"].tolist()
+prices_df = fetch_prices(tickers, period="2d")
+
+if not prices_df.empty:
+    last  = prices_df.iloc[-1]
+    prev  = prices_df.iloc[-2]
+
+    clean_df["Price"]     = last.reindex(tickers).values
+    clean_df["Δ 1d %"]    = (
+        (last - prev) / prev * 100
+    ).reindex(tickers).round(2).values
+
+# Mark the new cols as read-only so users can’t type over them
+editor_df = st.data_editor(
+    clean_df,
+    disabled={"Price": True, "Δ 1d %": True},
+    num_rows="dynamic",
+    use_container_width=True,
+    key="alloc_editor",
+    hide_index=True,
+)
+
+# Persist edits back into session state
+st.session_state.alloc_df       = editor_df
+st.session_state.portfolio      = editor_df["Ticker"].tolist()
+st.session_state.portfolio_alloc = dict(
+    zip(editor_df["Ticker"], editor_df["Amount ($)"])
+)
+
+# ── delete the entire 'tiles_df' block further down ──────────────────
+
+
 others  = [t for t in portfolio if t != primary]
 basket  = [primary] + others
 
