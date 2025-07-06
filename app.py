@@ -263,6 +263,38 @@ st.session_state.portfolio_alloc = dict(
     zip(clean_df["Ticker"], clean_df["Amount ($)"])
 )
 
+# ─────────────────── SECTOR EXPOSURE BREAKDOWN ───────────────────
+st.markdown("### 🧠 Sector Exposure Summary")
+
+# 1. Lookup sector for each ticker
+sector_map = {}
+for tick in st.session_state.portfolio:
+    try:
+        info = yf.Ticker(tick).info
+        sector = info.get("sector", "Unknown")
+        sector_map[tick] = sector
+    except Exception:
+        sector_map[tick] = "Unknown"
+
+# 2. Aggregate allocations by sector
+alloc_df = pd.DataFrame({
+    "Ticker": list(st.session_state.portfolio_alloc.keys()),
+    "Amount": list(st.session_state.portfolio_alloc.values())
+})
+alloc_df["Sector"] = alloc_df["Ticker"].map(sector_map)
+sector_df = (
+    alloc_df.groupby("Sector")["Amount"].sum()
+    .sort_values(ascending=False)
+    .reset_index()
+)
+sector_df["%"] = (sector_df["Amount"] / sector_df["Amount"].sum() * 100).round(1)
+
+# 3. Show in table and chart
+st.dataframe(sector_df.rename(columns={"%": "Allocation %"}), use_container_width=True)
+st.plotly_chart(
+    px.pie(sector_df, names="Sector", values="Amount", title="Sector Breakdown", hole=0.4),
+    use_container_width=True
+)
 
 portfolio = st.session_state.portfolio
 
@@ -280,42 +312,6 @@ if not tiles_df.empty:
                 f"<span class='metric-small' style='color:{'lime' if d>=0 else 'tomato'}'>{d:+.2f}%</span>",
                 unsafe_allow_html=True,
             )
-# ─────────────────── SECTOR EXPOSURE BREAKDOWN ───────────────────
-st.markdown("### 🧠 Sector Exposure Summary")
-
-# 1. Lookup sector for each ticker
-sector_map = {}
-for tick in portfolio:
-    try:
-        info = yf.Ticker(tick).info
-        sector = info.get("sector", "Unknown")
-        sector_map[tick] = sector
-    except Exception:
-        sector_map[tick] = "Unknown"
-
-# 2. Aggregate allocations by sector
-alloc_df = pd.DataFrame({
-    "Ticker": list(st.session_state.portfolio_alloc.keys()),
-    "Amount": list(st.session_state.portfolio_alloc.values())
-})
-alloc_df["Sector"] = alloc_df["Ticker"].map(sector_map)
-sector_df = (
-    alloc_df.groupby("Sector")
-    ["Amount"].sum()
-    .sort_values(ascending=False)
-    .to_frame()
-    .reset_index()
-)
-sector_df["%"] = (sector_df["Amount"] / sector_df["Amount"].sum() * 100).round(1)
-
-# 3. Show in table and chart
-st.dataframe(sector_df.rename(columns={"%": "Allocation %"}), use_container_width=True)
-
-st.plotly_chart(
-    px.pie(sector_df, names="Sector", values="Amount",
-           title="Sector Breakdown", hole=0.4),
-    use_container_width=True
-)
 
 st.divider()
 primary = st.selectbox("🎯  Focus stock", portfolio, 0)
@@ -427,8 +423,6 @@ if st.button("Suggest strategy", type="primary"):
         f"{k}: ${v:,.0f}" for k, v in st.session_state.portfolio_alloc.items()
     ) or "None provided"
     total_capital = sum(st.session_state.portfolio_alloc.values())
-    total_capital = sum(st.session_state.portfolio_alloc.values())
-    ignored = "; ".join(st.session_state.risk_ignore) or "None"
     risk_string = ", ".join(risk_list) or "None"
     alloc_str = "; ".join(
         f"{k}: ${v:,.0f}" for k, v in st.session_state.portfolio_alloc.items()
@@ -448,7 +442,10 @@ if st.button("Suggest strategy", type="primary"):
 
         Your task is to design a tactical hedge that offsets risk while preserving exposure to high-conviction positions.
 
-        For each hedge recommendation, include 1–2 ticker symbols of ETFs or instruments that could help mitigate the risk.
+        For each hedge recommendation, include:
+        – 1–2 ticker symbols (e.g., VIXY, PSQ, XLF puts)  
+        – A rationale linking the hedge to specific risks  
+        – A reliable source (URL)
 
         **Return EXACTLY in this markdown order**:
 
@@ -478,6 +475,52 @@ if st.button("Suggest strategy", type="primary"):
     if match:
         st.subheader("⚠️ Residual Risks (quick view)")
         st.markdown(f"<div class='card'>{match.group(0)}</div>", unsafe_allow_html=True)
+
+    # ───────────────────── PORTFOLIO vs HEDGE COMPOSITION ─────────────────────
+    st.markdown("### 📊 Portfolio vs Hedge Allocation Breakdown")
+
+    import io
+    import plotly.graph_objects as go
+
+    # Try to parse the markdown table from the plan
+    md_lines = plan_md.splitlines()
+    table_lines = [line for line in md_lines if '|' in line and not line.startswith('###')]
+
+    if len(table_lines) >= 3:
+        try:
+            table_str = '\n'.join(table_lines)
+            df = pd.read_csv(io.StringIO(table_str), sep='|')
+            df.columns = [c.strip() for c in df.columns]
+            df = df.dropna(subset=['Ticker', 'Amount ($)'])
+
+            df["Amount ($)"] = df["Amount ($)"].str.replace("$", "").str.replace(",", "").astype(float)
+            df["Label"] = df["Ticker"] + " (" + df["Position"].str.strip() + ")"
+
+            port_df = pd.DataFrame({
+                "Label": [f"{k} (Long)" for k in st.session_state.portfolio_alloc.keys()],
+                "Amount": st.session_state.portfolio_alloc.values(),
+            })
+
+            hedge_df = df[["Label", "Amount ($)"]].rename(columns={"Amount ($)": "Amount"})
+
+            col1, col2 = st.columns(2)
+            with col1:
+                st.plotly_chart(go.Figure(
+                    data=[go.Pie(labels=port_df["Label"], values=port_df["Amount"],
+                                hoverinfo="label+percent", textinfo="label")],
+                    layout_title_text="Current Portfolio"
+                ), use_container_width=True)
+
+            with col2:
+                st.plotly_chart(go.Figure(
+                    data=[go.Pie(labels=hedge_df["Label"], values=hedge_df["Amount"],
+                                hoverinfo="label+percent", textinfo="label")],
+                    layout_title_text="Suggested Hedge Allocation"
+                ), use_container_width=True)
+
+        except Exception as e:
+            st.warning(f"Could not render hedge allocation chart: {e}")
+
 
 # ─────────────────────────── OPTIONAL CHARTS ─────────────────────────
 if show_charts:
