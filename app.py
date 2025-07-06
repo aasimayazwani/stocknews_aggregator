@@ -611,7 +611,15 @@ if st.button("Suggest strategy", type="primary"):
             user_df["Rationale"] = "—"
 
             # Final column ordering
-            final_cols = hedge_cols  # same as user_cols + "Rationale"
+            # Drop rationale from user_df for visual clarity (optional)
+            user_df = user_df[user_cols]  # <- no "Rationale" in user view
+            df = df[hedge_cols]           # <- keep rationale in hedge
+
+            # Add blank rationale column to user_df just for alignment (but hidden)
+            user_df["Rationale"] = ""
+
+            # Final mergeable column order
+            final_cols = hedge_cols
             user_df = user_df[final_cols]
             df = df[final_cols]
 
