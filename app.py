@@ -511,8 +511,10 @@ if st.button("Suggest strategy", type="primary"):
     }[st.session_state.explanation_pref]
 
     # Main prompt with guidance embedded
+    # ────────────────────────── BUILD LLM PROMPT ──────────────────────────
+# (put this right before the ask_openai() call)
     prompt = textwrap.dedent(f"""
-        Act as a **hedging strategist**.
+        Act as a **tactical hedging strategist**.
 
         • **Basket**: {', '.join(basket)}
         • **Current allocation**: {alloc_str}
@@ -521,32 +523,44 @@ if st.button("Suggest strategy", type="primary"):
         • **Beta band**: {beta_rng[0]:.2f}–{beta_rng[1]:.2f}
         • **Stop-loss**: {stop_loss} %
         • **Detected headline risks** for {primary}: {risk_string}
-        • **Ignore** the following risks: {ignored}
+        • **Ignore**: {ignored if ignored else 'None'}
 
         ### Investor profile
         Experience level: {st.session_state.experience_level}
-        Preferences: {st.session_state.explanation_pref}
-        Style guidance: {experience_note} {explanation_note}
+        Explanation preference: {st.session_state.explanation_pref}
 
-        ### Instructions:
-        Design a tactical hedge to offset risk while preserving conviction positions.
+        ### Instructions
+        1. Propose a hedge that preserves conviction positions while neutralising the key risks above.  
+        – Use **real, liquid instruments** (ETF, index future, inverse ETF, options proxy, FX pair, etc.).  
+        – Keep the *net beta* inside the specified band.
+        2. Optimise cost / carry where possible and respect the stop-loss constraint.
+        3. **Return only GitHub-flavoured Markdown, nothing else.**
 
-        For each hedge, include 1–2 **tickers** (ETF, inverse, option proxy, or macro exposure).
+        #### Required output format
 
-        Return **only markdown**, in this exact format:
+        **Table (no header row other than the first line):**
 
-        1️⃣ A table with columns: **Ticker | Position | Amount ($) | Rationale | Source**  
-        – Use a real clickable URL in the *Source* column.
+        | Ticker | Position | Amount ($) | Rationale | Source |
+        |--------|----------|------------|-----------|--------|
 
-        2️⃣ `### Summary`: a short paragraph (max 300 chars) summarizing the strategy.
+        • **Rationale** rules  
+        – If “Just the strategy”: ≤ 25 words.  
+        – If “Explain the reasoning”: 2 sentences (≈30-50 words).  
+        – If “Both”: 2-3 sentences (≈40-70 words) plus one sentence on trade-offs (carry, tracking error).  
+        – Finish each rationale with a citation tag like **[1]**.
 
-        3️⃣ `### Residual Risks`: a numbered list (≤ 25 words each), each ending with a **source URL**.
+        • **Source** column  
+        – A single, **clickable URL** that substantiates the rationale.  
+        – The numeric tag (**[1]**, **[2]** …) must map 1-to-1 to the URL.
 
-        Do NOT wrap any output in code blocks or quotes.
+        **After the table include:**
+
+        2️⃣ `### Summary` – one paragraph ≤ 300 characters recapping the hedge.
+
+        3️⃣ `### Residual Risks` – a numbered list, ≤ 25 words each, each ending with its own source URL.
+
+        **Do NOT wrap any part of the output in code fences or quotes.**
     """).strip()
-
-
-
 
     # 2.  Call OpenAI -----------------------------------------------------------
     with st.spinner("Calling ChatGPT…"):
