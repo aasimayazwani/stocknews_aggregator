@@ -280,6 +280,42 @@ if not tiles_df.empty:
                 f"<span class='metric-small' style='color:{'lime' if d>=0 else 'tomato'}'>{d:+.2f}%</span>",
                 unsafe_allow_html=True,
             )
+# ─────────────────── SECTOR EXPOSURE BREAKDOWN ───────────────────
+st.markdown("### 🧠 Sector Exposure Summary")
+
+# 1. Lookup sector for each ticker
+sector_map = {}
+for tick in portfolio:
+    try:
+        info = yf.Ticker(tick).info
+        sector = info.get("sector", "Unknown")
+        sector_map[tick] = sector
+    except Exception:
+        sector_map[tick] = "Unknown"
+
+# 2. Aggregate allocations by sector
+alloc_df = pd.DataFrame({
+    "Ticker": list(st.session_state.portfolio_alloc.keys()),
+    "Amount": list(st.session_state.portfolio_alloc.values())
+})
+alloc_df["Sector"] = alloc_df["Ticker"].map(sector_map)
+sector_df = (
+    alloc_df.groupby("Sector")
+    ["Amount"].sum()
+    .sort_values(ascending=False)
+    .to_frame()
+    .reset_index()
+)
+sector_df["%"] = (sector_df["Amount"] / sector_df["Amount"].sum() * 100).round(1)
+
+# 3. Show in table and chart
+st.dataframe(sector_df.rename(columns={"%": "Allocation %"}), use_container_width=True)
+
+st.plotly_chart(
+    px.pie(sector_df, names="Sector", values="Amount",
+           title="Sector Breakdown", hole=0.4),
+    use_container_width=True
+)
 
 st.divider()
 primary = st.selectbox("🎯  Focus stock", portfolio, 0)
@@ -391,6 +427,13 @@ if st.button("Suggest strategy", type="primary"):
         f"{k}: ${v:,.0f}" for k, v in st.session_state.portfolio_alloc.items()
     ) or "None provided"
     total_capital = sum(st.session_state.portfolio_alloc.values())
+    total_capital = sum(st.session_state.portfolio_alloc.values())
+    ignored = "; ".join(st.session_state.risk_ignore) or "None"
+    risk_string = ", ".join(risk_list) or "None"
+    alloc_str = "; ".join(
+        f"{k}: ${v:,.0f}" for k, v in st.session_state.portfolio_alloc.items()
+    ) or "None provided"
+
     prompt = textwrap.dedent(f"""
         Act as a **hedging strategist**.
 
@@ -405,6 +448,8 @@ if st.button("Suggest strategy", type="primary"):
 
         Your task is to design a tactical hedge that offsets risk while preserving exposure to high-conviction positions.
 
+        For each hedge recommendation, include 1–2 ticker symbols of ETFs or instruments that could help mitigate the risk.
+
         **Return EXACTLY in this markdown order**:
 
         1️⃣ A table (markdown pipe format) with columns **Ticker | Position | Amount ($) | Rationale | Source**  
@@ -416,6 +461,7 @@ if st.button("Suggest strategy", type="primary"):
 
         Do not wrap anything in code-fences.
     """).strip()
+
 
 
     # 2.  Call OpenAI -----------------------------------------------------------
