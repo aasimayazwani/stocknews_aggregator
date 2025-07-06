@@ -629,7 +629,7 @@ if st.button("Suggest strategy", type="primary"):
             combined_df = pd.concat([user_df, df], ignore_index=True)
             display_df = combined_df.drop(columns=["Rationale"])
             st.dataframe(display_df, use_container_width=True)
-            st.session_state.combined_df = combined_df
+            #st.session_state.combined_df = combined_df
 
             # ✅ Guard in case data becomes stale or corrupted
             if combined_df.empty:
