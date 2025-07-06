@@ -136,17 +136,41 @@ def clean_md(md: str) -> str:
     return md.replace("*", "").replace("_", "")
 
 
+def fallback_ticker_lookup(name: str, model_name: str = "gpt-3.5-turbo") -> str:
+    prompt = f"What is the stock ticker symbol for the publicly traded company '{name}'?"
+
+    raw = ask_openai(
+        model=model_name,
+        system_prompt="You are a financial assistant that returns only the correct stock ticker symbol.",
+        user_prompt=prompt,
+    )
+
+    import re
+    match = re.search(r"\b[A-Z]{2,5}\b", raw.strip())
+    return match.group(0) if match else ""
+
 @st.cache_data(ttl=3600)
-def search_tickers(query):
+def search_tickers(query: str) -> List[str]:
     url = f"https://query1.finance.yahoo.com/v1/finance/search?q={query}"
     try:
         resp = requests.get(url, timeout=5)
         results = resp.json().get("quotes", [])
         results = sorted(results, key=lambda r: r.get("score", 0), reverse=True)
-        return [
-            f"{r['symbol']} – {r.get('shortname') or r.get('longname', '')}"
-            for r in results if "symbol" in r
-        ]
+
+        tickers = []
+        for r in results:
+            symbol = r.get("symbol", "")
+            name = r.get("shortname") or r.get("longname") or ""
+            if symbol and name:
+                tickers.append(f"{symbol} – {name}")
+
+        # ✅ If no good matches found, fallback to GPT
+        if not tickers and len(query.strip()) > 2:
+            fallback = fallback_ticker_lookup(query)
+            if fallback:
+                tickers.append(f"{fallback} – (GPT suggested)")
+
+        return tickers
     except Exception:
         return []
 
