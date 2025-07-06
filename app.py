@@ -561,7 +561,16 @@ if st.button("Suggest strategy", type="primary"):
             # STEP 3: Merge tables
             combined_df = pd.concat([user_df, df], ignore_index=True)
 
-            st.dataframe(combined_df, use_container_width=True)
+            # ✅ Store in session state to persist across reruns
+            st.session_state.strategy_df = df
+            st.session_state.combined_df = combined_df
+
+            # ✅ Guard in case data becomes stale or corrupted
+            if combined_df.empty:
+                st.warning("Combined hedge strategy is empty. Please re-generate.")
+            else:
+                st.dataframe(combined_df, use_container_width=True)
+
 
             with st.sidebar:
                 if st.checkbox("📊 Show Post-Hedge Pie Chart", value=False, key="sidebar_post_hedge_pie"):
