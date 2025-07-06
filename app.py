@@ -489,30 +489,29 @@ with st.expander("⚖️  Risk controls"):
 
 # ─────────────────────── Strategy generation & rendering ───────────────────────
 if st.button("Suggest strategy", type="primary"):
-    # 1.  Build prompt ----------------------------------------------------------
-    ignored = "; ".join(st.session_state.risk_ignore) or "None"
-    total_capital = sum(st.session_state.portfolio_alloc.values())
-    risk_string = ", ".join(risk_list) or "None"
-    alloc_str = "; ".join(
-        f"{k}: ${v:,.0f}" for k, v in st.session_state.portfolio_alloc.items()
-    ) or "None provided"
+    # ─── 1. Collect context values ───────────────────────────
+    ignored        = "; ".join(st.session_state.risk_ignore) or "None"
+    total_capital  = sum(st.session_state.portfolio_alloc.values())
+    risk_string    = ", ".join(risk_list) or "None"
+    alloc_str      = "; ".join(f"{k}: ${v:,.0f}" 
+                               for k,v in st.session_state.portfolio_alloc.items()) or "None"
 
-    # Build user-style guidance from profile
+    # ─── 2.  🔹 NEW: dynamic tone-/length guidance  ───────────
     experience_note = {
-        "Beginner": "Use simple, jargon-free language appropriate for a retail investor.",
-        "Intermediate": "Use moderate technical terms and explain key terms when needed.",
-        "Expert": "Use professional investment language without oversimplification.",
+        "Beginner":     "Use plain language and define jargon the first time you use it.",
+        "Intermediate": "Assume working knowledge of finance; keep explanations concise.",
+        "Expert":       "Write in professional sell-side style; no hand-holding.",
     }[st.session_state.experience_level]
 
-    explanation_note = {
-        "Just the strategy": "Skip all explanations — just give the hedge table and summary.",
-        "Explain the reasoning": "For each hedge, explain the logic behind the choice.",
-        "Both": "Include the full hedge table, and explain the rationale for each entry in clear terms.",
-    }[st.session_state.explanation_pref]
-
-    # Main prompt with guidance embedded
-    # ────────────────────────── BUILD LLM PROMPT ──────────────────────────
-# (put this right before the ask_openai() call)
+    exp_pref = st.session_state.explanation_pref
+    if exp_pref == "Just the strategy":
+        rationale_rule = "Each *Rationale* must be **≤ 25 words (one sentence)**."
+    elif exp_pref == "Explain the reasoning":
+        rationale_rule = ("Each *Rationale* must be **2 sentences totalling ≈ 30-50 words** "
+                          "(logic + risk linkage).")
+    else:                   # "Both"
+        rationale_rule = ("Each *Rationale* must be **3 sentences totalling ≈ 60-90 words** – "
+                          "1️⃣ logic, 2️⃣ quantitative context, 3️⃣ trade-offs.")
     prompt = textwrap.dedent(f"""
         Act as a **tactical hedging strategist**.
 
@@ -522,45 +521,31 @@ if st.button("Suggest strategy", type="primary"):
         • **Horizon**: {horizon} months
         • **Beta band**: {beta_rng[0]:.2f}–{beta_rng[1]:.2f}
         • **Stop-loss**: {stop_loss} %
-        • **Detected headline risks** for {primary}: {risk_string}
-        • **Ignore**: {ignored if ignored else 'None'}
+        • **Detected headline risks for {primary}**: {risk_string or 'None'}
+        • **Ignore**: {ignored or 'None'}
 
         ### Investor profile
-        Experience level: {st.session_state.experience_level}
-        Explanation preference: {st.session_state.explanation_pref}
+        Experience: {st.session_state.experience_level}   •  Detail level: {exp_pref}
+        → {experience_note}
 
-        ### Instructions
-        1. Propose a hedge that preserves conviction positions while neutralising the key risks above.  
-        – Use **real, liquid instruments** (ETF, index future, inverse ETF, options proxy, FX pair, etc.).  
-        – Keep the *net beta* inside the specified band.
-        2. Optimise cost / carry where possible and respect the stop-loss constraint.
-        3. **Return only GitHub-flavoured Markdown, nothing else.**
-
-        #### Required output format
-
-        **Table (no header row other than the first line):**
+        ### Output specification — **Markdown only**
 
         | Ticker | Position | Amount ($) | Rationale | Source |
         |--------|----------|------------|-----------|--------|
 
-        • **Rationale** rules  
-        – If “Just the strategy”: ≤ 25 words.  
-        – If “Explain the reasoning”: 2 sentences (≈30-50 words).  
-        – If “Both”: 2-3 sentences (≈40-70 words) plus one sentence on trade-offs (carry, tracking error).  
-        – Finish each rationale with a citation tag like **[1]**.
+        **Rationale requirements**  
+        {rationale_rule}  
+        • Finish with a citation tag like **[1]** that matches the URL in *Source*.
 
-        • **Source** column  
-        – A single, **clickable URL** that substantiates the rationale.  
-        – The numeric tag (**[1]**, **[2]** …) must map 1-to-1 to the URL.
+        **Source column** = one clickable URL per row (no text beyond the link).
 
-        **After the table include:**
+        After the table include:  
+        1. `### Summary` – ≤ 300 chars.  
+        2. `### Residual Risks` – numbered list, ≤ 25 words each, each ending with its own URL.
 
-        2️⃣ `### Summary` – one paragraph ≤ 300 characters recapping the hedge.
-
-        3️⃣ `### Residual Risks` – a numbered list, ≤ 25 words each, each ending with its own source URL.
-
-        **Do NOT wrap any part of the output in code fences or quotes.**
+        ❗ Do **not** wrap anything in code fences or quotes.
     """).strip()
+
 
     # 2.  Call OpenAI -----------------------------------------------------------
     with st.spinner("Calling ChatGPT…"):
