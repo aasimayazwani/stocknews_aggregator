@@ -318,17 +318,18 @@ ticker_df["Label"] = (
 )
 
 # 9. Optional pie chart toggle
-if st.checkbox("📊 Show Portfolio Pie Chart", value=False):
-    st.plotly_chart(
-        px.pie(
-            ticker_df,
-            names="Label",
-            values="Amount",
-            title="Current Portfolio Allocation",
-            hole=0.3
-        ).update_traces(textinfo="label+percent"),
-        use_container_width=True
-    )
+with st.sidebar:
+    if st.checkbox("📊 Show Portfolio Pie Chart", value=False, key="sidebar_portfolio_pie"):
+        st.markdown("#### 🥧 Portfolio Allocation")
+        st.plotly_chart(
+            px.pie(
+                ticker_df,
+                names="Label",
+                values="Amount",
+                hole=0.3
+            ).update_traces(textinfo="label+percent"),
+            use_container_width=True
+        )
 
 # 10. Save final list
 portfolio = st.session_state.portfolio
@@ -656,18 +657,18 @@ if st.button("Suggest strategy", type="primary"):
             pie_df["Label"] = pie_df["Ticker"] + " (" + pie_df["Position"] + ")"
             pie_df["Amount"] = pie_df["Amount ($)"]
 
-            if st.checkbox("📊 Show Post-Hedge Pie Chart", value=True, key="post_hedge_pie"):
-                st.markdown("### 📊 Post-Hedge Allocation Overview")
-                st.plotly_chart(
-                    px.pie(
-                        pie_df,
-                        names="Label",
-                        values="Amount",
-                        title="Post-Hedge Portfolio",
-                        hole=0.3
-                    ).update_traces(textinfo="label+percent"),
-                    use_container_width=True
-                )
+            with st.sidebar:
+                if st.checkbox("📊 Show Post-Hedge Pie Chart", value=True, key="sidebar_post_hedge_pie"):
+                    st.markdown("#### 🧮 Post-Hedge Allocation")
+                    st.plotly_chart(
+                        px.pie(
+                            pie_df,
+                            names="Label",
+                            values="Amount",
+                            hole=0.3
+                        ).update_traces(textinfo="label+percent"),
+                        use_container_width=True
+                    )
 
 
             # STEP 5: Bar Chart – Suggested Hedge Alone
