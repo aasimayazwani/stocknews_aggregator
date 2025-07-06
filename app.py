@@ -257,21 +257,6 @@ def search_tickers(query):
     except Exception as e:
         return []
 
-# Interactive ticker search section
-st.markdown("#### Add a stock/ETF to your portfolio")
-query = st.text_input("🔎 Search for ticker by name or symbol (e.g., 'Microsoft', 'AAPL')", "")
-
-if query:
-    options = search_tickers(query)
-    if options:
-        selected = st.selectbox("Choose from results", options, key="ticker_select")
-        ticker_symbol = selected.split("–")[0].strip()
-        if st.button("➕ Add to portfolio"):
-            if ticker_symbol not in st.session_state.portfolio:
-                st.session_state.portfolio.append(ticker_symbol)
-    else:
-        st.warning("No matching tickers found.")
-
 # ─────────────────── 💰 POSITION-SIZE EDITOR ────────────────────
 st.markdown("### 💰 Position sizes Editable")
 
