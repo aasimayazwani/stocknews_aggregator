@@ -13,7 +13,7 @@ from config import DEFAULT_MODEL          # local module
 from openai_client import ask_openai      # wrapper around OpenAI API
 from stock_utils import get_stock_summary # your own helper
 # ────────────────────────────────── THEME ─────────────────────────────────
-st.set_page_config(page_title="Strategy Chatbot", layout="wide")
+st.set_page_config(page_title="Hedge Strategy Chatbot", layout="wide")
 
 st.markdown(
     """
@@ -369,8 +369,8 @@ with st.sidebar.expander("🔮  Quarterly outlook"):
 st.markdown("### 📝  Strategy Designer")
 sector_guess = yf.Ticker(primary).info.get("sector", "")
 sector_in    = st.text_input("Sector", sector_guess)
-goal         = st.selectbox("Positioning goal", ["Long", "Short", "Hedged", "Neutral"])
-avoid_sym    = st.text_input("Hedge / avoid ticker", primary)
+#goal         = st.selectbox("Positioning goal", ["Long", "Short", "Hedged", "Neutral"])
+#avoid_sym    = st.text_input("Hedge / avoid ticker", primary)
 capital      = st.number_input("Capital (USD)", 1000, 1_000_000, 10_000, 1000)
 horizon      = st.slider("Time horizon (months)", 1, 24, 6)
 
@@ -387,13 +387,11 @@ if st.button("Suggest strategy", type="primary"):
         f"{k}: ${v:,.0f}" for k, v in st.session_state.portfolio_alloc.items()
     ) or "None provided"
     prompt = textwrap.dedent(f"""
-        Act as a **portfolio strategist**.
+        Act as a **hedging strategist**.
 
         • **Basket**: {', '.join(basket)}
         • **Current allocation**: {alloc_str}
         • **Sector**: {sector_in}
-        • **Goal**: {goal.lower()}
-        • **Hedge / avoid**: {avoid_sym}
         • **Capital**: ${capital:,.0f}
         • **Horizon**: {horizon} months
         • **Beta band**: {beta_rng[0]:.2f}–{beta_rng[1]:.2f}
