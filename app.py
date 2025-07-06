@@ -129,6 +129,7 @@ if "portfolio"   not in st.session_state: st.session_state.portfolio   = ["AAPL"
 if "outlook_md"  not in st.session_state: st.session_state.outlook_md  = None
 if "risk_cache"  not in st.session_state: st.session_state.risk_cache  = {}  # {ticker: [risks]}
 if "risk_ignore" not in st.session_state: st.session_state.risk_ignore = []  # selected exclusions
+if "selected_risks" not in st.session_state: st.session_state.selected_risks = []
 
 # ──────────────────────────── HELPERS ────────────────────────────────
 def clean_md(md: str) -> str:
@@ -345,6 +346,7 @@ if primary not in st.session_state.risk_cache:
         st.session_state.risk_cache[primary] = web_risk_scan(primary)
 
 risk_list = st.session_state.risk_cache[primary]
+selected_risks = st.session_state.get("selected_risks", risk_list)
 # Dummy mapping of risk → URL (replace with real scraping or LLM output if available)
 risk_links = {
     r: f"https://www.google.com/search?q={primary}+{r.replace(' ', '+')}" for r in risk_list
@@ -389,7 +391,7 @@ for i, risk in enumerate(risk_list):
     # Track which are still selected
     if st.session_state[key]:
         selected_risks.append(risk)
-
+st.session_state.selected_risks = selected_risks
 # End the grid
 st.markdown("</div>", unsafe_allow_html=True)
 
@@ -513,8 +515,10 @@ if st.button("Suggest strategy", type="primary"):
 
     # 3.  Clean & show ----------------------------------------------------------
     plan_md = clean_md(raw_md)
+    plan_md_main = re.sub(r"### Residual Risks.*", "", plan_md, flags=re.I | re.S)
+
     st.subheader("📌 Suggested strategy")
-    st.markdown(plan_md, unsafe_allow_html=True)
+    st.markdown(plan_md_main, unsafe_allow_html=True)
 
     # 4.  Optionally pull out Residual Risks (to highlight in a card) ----------
     match = re.search(r"### Residual Risks.*", plan_md, flags=re.I | re.S)
@@ -549,8 +553,8 @@ if st.button("Suggest strategy", type="primary"):
                 .str.extract(r"(\d+\.?\d*)")[0]
                 .astype(float)
             )
-            df["Price"] = "—"
-            df["Δ 1d %"] = "—"
+            df["Price"] = "_n/a_"
+            df["Δ 1d %"] = "_n/a_"
             df["Source"] = "Suggested hedge"
 
             # Reorder columns for consistency
@@ -566,7 +570,7 @@ if st.button("Suggest strategy", type="primary"):
 
             # STEP 3: Merge user + strategy dataframes
             combined_df = pd.concat([user_df, df], ignore_index=True)
-
+            st.markdown("---")  # Visually separates from earlier sections
             st.markdown("### 🧾 Unified Portfolio + Strategy Table")
             st.dataframe(combined_df, use_container_width=True)
 
@@ -575,19 +579,19 @@ if st.button("Suggest strategy", type="primary"):
             pie_df["Label"] = pie_df["Ticker"] + " (" + pie_df["Position"] + ")"
             pie_df["Amount"] = pie_df["Amount ($)"]
 
-            st.markdown("### 📊 Post-Hedge Allocation Overview")
-            pie_df["Label"] = pie_df["Label"] + " ($" + pie_df["Amount"].round(0).astype(int).astype(str) + ")"
+            if st.checkbox("📊 Show Post-Hedge Pie Chart", value=True, key="post_hedge_pie"):
+                st.markdown("### 📊 Post-Hedge Allocation Overview")
+                st.plotly_chart(
+                    px.pie(
+                        pie_df,
+                        names="Label",
+                        values="Amount",
+                        title="Post-Hedge Portfolio",
+                        hole=0.3
+                    ).update_traces(textinfo="label+percent"),
+                    use_container_width=True
+                )
 
-            st.plotly_chart(
-                px.pie(
-                    pie_df,
-                    names="Label",
-                    values="Amount",
-                    title="Post-Hedge Portfolio",
-                    hole=0.3
-                ).update_traces(textinfo="label+percent"),
-                use_container_width=True
-            )
 
             # STEP 5: Bar Chart – Suggested Hedge Alone
             st.markdown("### 📈 Hedge Allocation Breakdown (Bar Chart)")
