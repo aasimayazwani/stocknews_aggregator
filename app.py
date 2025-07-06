@@ -563,20 +563,21 @@ if st.button("Suggest strategy", type="primary"):
 
             st.dataframe(combined_df, use_container_width=True)
 
-            st.markdown("### 📊 Post-Hedge Allocation Overview")
-            pie_df = combined_df.copy()
-            pie_df["Label"] = pie_df["Ticker"] + " (" + pie_df["Position"] + ")"
-            pie_df["Amount"] = pie_df["Amount ($)"]
-            st.plotly_chart(
-                px.pie(
-                    pie_df,
-                    names="Label",
-                    values="Amount",
-                    title="Post-Hedge Portfolio",
-                    hole=0.3
-                ).update_traces(textinfo="label+percent"),
-                use_container_width=True
-            )
+            with st.sidebar:
+                if st.checkbox("📊 Show Post-Hedge Pie Chart", value=False, key="sidebar_post_hedge_pie"):
+                    st.markdown("#### 🧮 Post-Hedge Allocation")
+                    pie_df = combined_df.copy()
+                    pie_df["Label"] = pie_df["Ticker"] + " (" + pie_df["Position"] + ")"
+                    pie_df["Amount"] = pie_df["Amount ($)"]
+                    st.plotly_chart(
+                        px.pie(
+                            pie_df,
+                            names="Label",
+                            values="Amount",
+                            hole=0.3
+                        ).update_traces(textinfo="label+percent"),
+                        use_container_width=True
+                    )
 
         except Exception as e:
             st.warning(f"Could not parse or merge hedge table: {e}")
