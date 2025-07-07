@@ -432,7 +432,7 @@ st.session_state.selected_risks = selected_risks
 st.markdown("</div>", unsafe_allow_html=True)
 
 # Update the exclusion list in session state
-st.session_state.risk_ignore = [r for r in risk_list if r not in selected_risks]
+st.session_state.risk_ignore = [r for r in risk_titles if r not in selected_risks]
 
 
 #st.session_state.risk_ignore = [r for r in risk_list if r not in exclude]
@@ -489,7 +489,7 @@ if st.button("Suggest strategy", type="primary"):
     # ─── 1. Collect context values ───────────────────────────
     ignored        = "; ".join(st.session_state.risk_ignore) or "None"
     total_capital  = sum(st.session_state.portfolio_alloc.values())
-    risk_string    = ", ".join(risk_list) or "None"
+    risk_string    = ", ".join(risk_titles) or "None"
     alloc_str      = "; ".join(f"{k}: ${v:,.0f}" 
                                for k,v in st.session_state.portfolio_alloc.items()) or "None"
 
