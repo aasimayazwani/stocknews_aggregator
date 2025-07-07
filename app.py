@@ -378,9 +378,45 @@ if primary not in st.session_state.risk_cache:
     with st.spinner("Scanning web…"):
         st.session_state.risk_cache[primary] = web_risk_scan(primary)
 
+
+
 risk_tuples = st.session_state.risk_cache[primary]      # output of web_risk_scan()
 risk_titles = [t[0] for t in risk_tuples]               # e.g. "FTC opens probe…"
 risk_links  = {title: url for title, url in risk_tuples}
+
+# 🚫 Skip risk rendering if no real headlines found
+if len(risk_titles) == 1 and "#".startswith(risk_links.get(risk_titles[0], "#")):
+    st.info(risk_titles[0])
+else:
+    # 🟢 Only run this block if real risks are found
+    selected_risks = []
+    risk_links = {r: f"https://www.google.com/search?q={primary}+{r.replace(' ', '+')}" for r in risk_titles}
+    st.markdown("<div class='risk-grid'>", unsafe_allow_html=True)
+    
+    for i, risk in enumerate(risk_titles):
+        if "no fresh negative headlines" in risk.lower():
+            continue  # Don't render dummy message as a checkbox
+        key = f"risk_{i}"
+        if key not in st.session_state:
+            st.session_state[key] = True
+        checked_attr = "checked" if st.session_state[key] else ""
+        html = f"""
+        <div class='risk-card'>
+          <label for="{key}">
+            <input type="checkbox" id="{key}" name="{key}" onclick="window.dispatchEvent(new Event('input'))" {checked_attr}>
+            <span>{risk}</span>
+            <a href="{risk_links[risk]}" target="_blank">ℹ️</a>
+          </label>
+        </div>
+        """
+        st.markdown(html, unsafe_allow_html=True)
+        if st.session_state[key]:
+            selected_risks.append(risk)
+
+    st.markdown("</div>", unsafe_allow_html=True)
+    st.session_state.selected_risks = selected_risks
+    st.session_state.risk_ignore = [r for r in risk_titles if r not in selected_risks]
+
 
 st.markdown("Un-check any headline you **do not** want the LLM to consider:")
 
@@ -428,7 +464,6 @@ st.markdown("</div>", unsafe_allow_html=True)
 
 # Update the exclusion list in session state
 st.session_state.risk_ignore = [r for r in risk_titles if r not in selected_risks]
-
 
 #st.session_state.risk_ignore = [r for r in risk_list if r not in exclude]
 
