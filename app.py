@@ -225,33 +225,50 @@ def fetch_prices(tickers: List[str], period="2d"):
     return df.dropna(axis=1, how="all")
 
 @st.cache_data(ttl=900, show_spinner=False)
-def web_risk_scan(ticker: str, model_name: str = DEFAULT_MODEL) -> list[tuple[str, str]]:
+def web_risk_scan(ticker: str) -> list[tuple[str, str]]:
     """
-    Returns up to 5 tuples: (headline, article_url)
+    Enhanced news-based risk scanner using NewsAPI,
+    looking for analyst-related and market-moving content.
+    Returns: List of (title, url) tuples.
     """
-    #api_key = "a9fd3ad7da454249af1ba008a644e423"
+    import os
+    from datetime import datetime, timedelta
+
     api_key = st.secrets.get("NEWSAPI_KEY") or os.getenv("NEWSAPI_KEY")
     if not api_key:
         return [("NEWSAPI key missing", "#")]
 
-    url = ("https://newsapi.org/v2/everything?"
-           f"q={ticker}&language=en&sortBy=publishedAt&pageSize=30&apiKey={api_key}")
+    query = f"{ticker} analyst OR earnings OR downgrade OR forecast OR target"
+    url = (
+        "https://newsapi.org/v2/everything?"
+        f"q={query}&"
+        "language=en&sortBy=publishedAt&pageSize=20&"
+        f"from={(datetime.now() - timedelta(days=14)).strftime('%Y-%m-%d')}&"
+        f"apiKey={api_key}"
+    )
+
     try:
-        articles = requests.get(url, timeout=8).json().get("articles", [])
+        resp = requests.get(url, timeout=10)
+        articles = resp.json().get("articles", [])
     except Exception as e:
         return [(f"News API error: {e}", "#")]
 
-    risks: list[tuple[str, str]] = []
-    bad_words = ("risk", "concern", "probe", "lawsuit", "slowdown",
-                 "regulation", "decline", "antitrust", "shortage", "recall")
-    for art in articles:
-        title = art.get("title", "")
-        if any(w in title.lower() for w in bad_words):
-            risks.append((title.split(" - ")[0], art.get("url", "#")))
-        if len(risks) == 5:
+    known_analysts = {"Dan Ives", "Mark Mahaney", "Katy Huberty", "Gene Munster"}
+
+    risks = []
+    for article in articles:
+        title = article.get("title", "")
+        url = article.get("url", "#")
+        if any(keyword in title.lower() for keyword in ["downgrade", "risk", "cut", "concern", "slashed", "fall", "caution", "bearish", "revised"]):
+            risks.append((title, url))
+        elif any(analyst in title for analyst in known_analysts):
+            risks.append((f"📊 Analyst: {title}", url))
+
+        if len(risks) >= 5:
             break
 
-    return risks or [(f"No fresh negative headlines found for {ticker}.", "#")]
+    return risks or [(f"No relevant analyst headlines found for {ticker}.", "#")]
+
 
 # ─────────────────────────────── STATE ────────────────────────────────
 if "history"     not in st.session_state: st.session_state.history     = []
@@ -373,7 +390,7 @@ portfolio = st.session_state.portfolio
 # ────────────────────── headline-risk retrieval (cached) ─────────────────────
 if primary not in st.session_state.risk_cache:
     with st.spinner("Scanning news with ChatGPT…"):
-        st.session_state.risk_cache[primary] = web_risk_scan(primary, model)
+        st.session_state.risk_cache[primary] = web_risk_scan(primary)
 
 # ────────────────────── AUTOMATED RISK SCAN SECTION ───────────────────
 st.markdown("### 🔍  Key headline risks")
