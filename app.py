@@ -403,14 +403,8 @@ with st.sidebar:
 # 10. Save final list
 portfolio = st.session_state.portfolio
 
-# ────────────────────── headline-risk retrieval (cached) ─────────────────────
-if primary not in st.session_state.risk_cache:
-    with st.spinner("Scanning news with ChatGPT…"):
-        st.session_state.risk_cache[primary] = web_risk_scan(primary)
-
 # ────────────────────── AUTOMATED RISK SCAN SECTION ───────────────────
 st.markdown("### 🔍  Key headline risks")
-
 if primary not in st.session_state.risk_cache:
     with st.spinner("Scanning web…"):
         st.session_state.risk_cache[primary] = web_risk_scan(primary)
