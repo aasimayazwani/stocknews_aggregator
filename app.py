@@ -224,40 +224,43 @@ def fetch_prices(tickers: List[str], period="2d"):
     return df.dropna(axis=1, how="all")
 
 @st.cache_data(ttl=900, show_spinner=False)
-# ─────────────────── RISK-SCAN via ChatGPT instead of DuckDuckGo ──────────────────
 def web_risk_scan(ticker: str, model_name: str = DEFAULT_MODEL) -> List[str]:
     """
-    Ask the LLM to return 4–5 hedge-relevant macro/sector risks affecting a given stock.
-    Each item is concise and grounded in current economic or market context.
+    Return 5 concise risk headlines for `ticker` using NewsAPI.org
+    instead of an LLM.  Falls back to a placeholder if nothing found.
     """
-    system = (
-        "You are a portfolio hedging strategist. "
-        "Your job is to identify macroeconomic, geopolitical, and sector-specific risk exposures "
-        "that should be hedged against for large equity positions."
+    api_key = "a9fd3ad7da454249af1ba008a644e423"
+    #api_key = st.secrets.get("NEWSAPI_KEY") or os.getenv("NEWSAPI_KEY")
+    if not api_key:
+        return [  # Fail fast but don't crash the app
+            "⚠️  NEWSAPI_KEY not set – cannot fetch real headlines."
+        ]
+
+    # Query latest English headlines mentioning the ticker symbol
+    url = (
+        "https://newsapi.org/v2/everything?"
+        f"q={ticker}&language=en&sortBy=publishedAt&pageSize=30&apiKey={api_key}"
     )
-
-    user = (
-        f"What are the 4–5 most relevant macro or sector-level RISK FACTORS "
-        f"that could affect {ticker}'s price or industry in the near term?\n\n"
-        "Return the answer as a plain Python list of short strings (each under 20 words), "
-        "e.g., ['Rising interest rates', 'Semiconductor supply chain issues', …].\n\n"
-        "No explanation, just the list."
-    )
-
-    raw = ask_openai(model=model_name, system_prompt=system, user_prompt=user)
-
-    # Try parsing the LLM reply as a Python list
     try:
-        import ast
+        resp = requests.get(url, timeout=8)
+        resp.raise_for_status()
+        articles = resp.json().get("articles", [])
+    except Exception as e:
+        return [f"News API error: {e}"]
 
-        lst = ast.literal_eval(raw.strip())
-        risks = [s.strip() for s in lst if isinstance(s, str) and s.strip()]
-        return risks or [f"No hedge-relevant risks identified for {ticker}."]
-    except Exception:
-        # Fallback: use line or comma splitting
-        lines = [ln.strip("•- ").strip() for ln in raw.splitlines()]
-        risks = [ln for ln in lines if ln]
-        return risks[:5] or [f"No hedge-relevant risks identified for {ticker}."]
+    # Quick-and-dirty heuristic ► keep sentences < 15 words
+    risks: list[str] = []
+    for art in articles:
+        title = art.get("title", "")
+        # Very naive filter: look for bearish words
+        if any(kw in title.lower() for kw in ["risk", "concern", "probe", "lawsuit",
+                                              "slowdown", "regulation", "decline",
+                                              "antitrust", "shortage", "recall"]):
+            risks.append(title.split(" - ")[0])      # strip publisher suffix
+        if len(risks) >= 5:
+            break
+
+    return risks or [f"No fresh negative headlines found for {ticker}."]
 
 # ─────────────────────────────── STATE ────────────────────────────────
 if "history"     not in st.session_state: st.session_state.history     = []
@@ -622,8 +625,6 @@ if st.button("Suggest strategy", type="primary"):
             # ✅ Store in session state
             st.session_state.user_df = user_df
             st.session_state.strategy_df = df
-
-            
 
             # 📌 Combine for final rendering (if needed)
             combined_df = pd.concat([user_df, df], ignore_index=True)
