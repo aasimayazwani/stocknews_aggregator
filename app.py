@@ -514,6 +514,14 @@ with st.sidebar.expander("🧑‍💼  Investor profile", expanded=True):
 # 🔄  Store & show sticky pill
 st.session_state.experience_level  = experience_level
 st.session_state.explanation_pref  = explanation_pref
+
+if "strategy_history" not in st.session_state:
+    st.session_state.strategy_history = []
+
+if st.button("🗑️ Clear Strategy History"):
+    st.session_state.strategy_history = []
+    st.rerun()
+
 st.sidebar.markdown(
     f"<div style='margin-top:6px;padding:4px 8px;border-radius:12px;"
     f"background:#334155;color:#f8fafc;display:inline-block;font-size:13px;'>"
@@ -700,7 +708,14 @@ if st.button("Suggest strategy", type="primary"):
 
             # ✅ Store in session state
             st.session_state.user_df = user_df
-            st.session_state.strategy_df = df
+            st.session_state.strategy_history.append({
+                "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "horizon": horizon,
+                "beta_band": beta_rng,
+                "capital": total_capital,
+                "strategy_df": df,
+                "rationale_md": plan_md,  # full rationale markdown
+            })
 
             # 📌 Combine for final rendering (if needed)
             combined_df = pd.concat([user_df, df], ignore_index=True)
@@ -743,6 +758,21 @@ if st.button("Suggest strategy", type="primary"):
         st.info("No hedge rationale to show.")
     else:
         render_rationale(hedge_df)  
+
+# ─────────────────────────────── STRATEGY HISTORY ───────────────────────────────
+st.markdown("### 🕘 Previous Strategies")
+
+if not st.session_state.strategy_history:
+    st.info("No previous strategies yet.")
+else:
+    for idx, run in reversed(list(enumerate(st.session_state.strategy_history))):
+        with st.expander(f"Run {idx+1} — {run['timestamp']} | Horizon: {run['horizon']} mo"):
+            st.markdown(
+                f"**Capital**: ${run['capital']:,.0f} • "
+                f"**Beta Band**: {run['beta_band'][0]}–{run['beta_band'][1]}"
+            )
+            st.dataframe(run["strategy_df"], use_container_width=True)
+            st.markdown(run["rationale_md"])
 
 # ─────────────────────────── OPTIONAL CHARTS ─────────────────────────
 if show_charts:
