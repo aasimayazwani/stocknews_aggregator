@@ -287,9 +287,10 @@ st.markdown("### 💰 Position sizes Editable")
 if "alloc_df" not in st.session_state:
     tickers = st.session_state.portfolio
     st.session_state.alloc_df = pd.DataFrame({
-        "Ticker": tickers,
-        "Amount ($)": [10_000] * len(tickers)
-    })
+    "Ticker": tickers,
+    "Amount ($)": [10_000] * len(tickers),
+    "Stop-Loss ($)": [None] * len(tickers)  # New column
+})
 
 # 2. Keep only valid rows
 st.session_state.alloc_df = (
@@ -323,14 +324,17 @@ else:
 # 6. Show a single data editor (with price columns read-only)
 editor_df = st.data_editor(
     clean_df,
-    disabled={"Price": True, "Δ 1d %": True},
+    disabled={"Price": True, "Δ 1d %": True},  # Stop-Loss is editable
     num_rows="dynamic",
     use_container_width=True,
-    key="alloc_editor",  # single key now
+    key="alloc_editor",
     hide_index=True,
 )
 
 # 7. Persist edits back to session state
+st.session_state.stop_loss_map = dict(
+    zip(editor_df["Ticker"], editor_df["Stop-Loss ($)"])
+)
 st.session_state.alloc_df = editor_df
 st.session_state.portfolio = editor_df["Ticker"].tolist()
 st.session_state.portfolio_alloc = dict(
@@ -539,12 +543,16 @@ if st.button("Suggest strategy", type="primary"):
     else:                   # "Both"
         rationale_rule = ("Each *Rationale* must be **3 sentences totalling ≈ 60-90 words** – "
                           "1️⃣ logic, 2️⃣ quantitative context, 3️⃣ trade-offs.")
+    stop_loss_str = "; ".join(
+        f"{ticker}: ${sl:.2f}" for ticker, sl in st.session_state.stop_loss_map.items() if pd.notnull(sl)
+    ) or "None"
     prompt = textwrap.dedent(f"""
         Act as a **tactical hedging strategist**.
 
         • **Basket**: {', '.join(basket)}
         • **Current allocation**: {alloc_str}
         • **Total capital**: ${total_capital:,.0f}
+        • **User-defined stop-loss levels**: {stop_loss_str}
         • **Horizon**: {horizon} months
         • **Beta band**: {beta_rng[0]:.2f}–{beta_rng[1]:.2f}
         • **Stop-loss**: {stop_loss} %
