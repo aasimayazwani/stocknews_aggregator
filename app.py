@@ -582,7 +582,28 @@ if st.button("Suggest strategy", type="primary"):
         f"{ticker}: ${float(sl):.2f}" for ticker, sl in st.session_state.stop_loss_map.items() if pd.notnull(sl)
     ) or "None"
     prompt = textwrap.dedent(f"""
-        Act as a **tactical hedging strategist**.
+        Act as a **tactical hedging strategist**. Prioritize capital preservation while staying within the beta band. Use this workflow:
+
+        ### Step-by-Step Reasoning
+        1. **Identify Hedging Targets**:  
+        - Flag assets with:  
+            - Stop-loss levels ≥ 5% above current price  
+            - High sensitivity to headline risks: {risk_string or "None"}  
+        - Ignore: {ignored or "None"}  
+
+        2. **Select Instruments**:  
+        - Use **put options** for direct downside protection.  
+            - Strike: At or **max 2% below** user’s stop-loss.  
+            - Expiration: **{horizon} months ± 2 weeks**.  
+        - Use **short positions** only for assets with stop-loss buffer ({stop_loss}%).  
+
+        3. **Size Positions**:  
+        - Allocate **≤15% of total capital** (${total_capital:,.0f}) to hedging.  
+        - Ensure portfolio beta remains **{beta_rng[0]:.2f}–{beta_rng[1]:.2f}** (rebalance if needed).  
+
+        4. **Cost Optimization**:  
+        - Target options premiums **≤3% of notional value** per hedge.  
+
 
         • **Basket**: {', '.join(basket)}
         • **Current allocation**: {alloc_str}
