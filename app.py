@@ -555,7 +555,7 @@ if st.button("Suggest strategy", type="primary"):
         • **User-defined stop-loss levels**: {stop_loss_str}
         • **Horizon**: {horizon} months
         • **Beta band**: {beta_rng[0]:.2f}–{beta_rng[1]:.2f}
-        • **Stop-loss**: {stop_loss} %
+        • **Portfolio-level stop-loss buffer** (shorts only): {stop_loss} %
         • **Detected headline risks for {primary}**: {risk_string or 'None'}
         • **Ignore**: {ignored or 'None'}
 
@@ -563,23 +563,50 @@ if st.button("Suggest strategy", type="primary"):
         Experience: {st.session_state.experience_level}   •  Detail level: {exp_pref}
         → {experience_note}
 
-        ### Output specification — **Markdown only**
+        ---
+        ### OUTPUT SPEC — *Markdown only*
 
         | Ticker | Position | Amount ($) | Rationale | Source |
         |--------|----------|------------|-----------|--------|
 
         **Rationale requirements**  
-        {rationale_rule}  
-        • Finish with a citation tag like **[1]** that matches the URL in *Source*.
+        {rationale_rule}
 
-        **Source column** = one clickable URL per row (no text beyond the link).
+        **If an entry uses options, you must include all five bullet-points below**  
+        1. **Option type** (Put/Call)  
+        2. **Strike price** (⚠️ *at or just below the user’s stop-loss level*)  
+        3. **Expiration date** (e.g. *16 Aug 2025, 30 DTE*)  
+        4. **Approx. premium per contract** (USD)  
+        5. **# Contracts** (justify sizing vs. underlying notional)  
 
-        After the table include:  
-        1. `### Summary` – ≤ 300 chars.  
-        2. `### Residual Risks` – numbered list, ≤ 25 words each, each ending with its own URL.
+        End every rationale with a citation tag like **[1]** that matches the URL in *Source*.
 
-        ❗ Do **not** wrap anything in code fences or quotes.
-    """).strip()
+        *Source* column = exactly one live, clickable URL per row—no extra text.
+
+        After the table add:  
+        1. `### Summary` — ≤ 300 chars.  
+        2. `### Residual Risks` — numbered list, ≤ 25 words each, each ending with its own URL.
+
+        ---
+        #### 📝 FORMAT EXAMPLE – FOR REFERENCE ONLY (DO NOT copy verbatim)
+
+        | Ticker | Position | Amount ($) | Rationale | Source |
+        |--------|----------|------------|-----------|--------|
+        | AAPL | **Put Option** | 1,000 | Buy 3 × Aug $175 puts (≈ $2.30 / c) to cap downside below $172 stop-loss; 1-month horizon aligns with earnings gap risk. **[1]** | https://finance.yahoo.com/quote/AAPL/options |
+        | MSFT | Long | 9,000 | Maintain core stake; minor trim funds puts while preserving upside vs. AI catalysts. **[2]** | https://www.cnbc.com/2025/07/01/microsoft-ai-outlook.html |
+
+        ### Summary  
+        Suggests tight put hedges at strikes just under stop-losses; retains core upside while capping downside to –5 %.
+
+        ### Residual Risks  
+        1. Vol crush reduces hedge efficacy if implied vols retrace. https://www.cboe.com  
+        2. Macro shock may breach put strikes before adjustment window. https://www.federalreserve.gov
+        ---
+
+        Use the above example **only** to mirror structure, level of detail, and option specificity.  
+        ❗ Absolutely **do not** wrap your final answer in code fences or quotes.
+        """).strip()
+
 
 
     # 2.  Call OpenAI -----------------------------------------------------------
