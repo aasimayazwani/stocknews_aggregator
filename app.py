@@ -544,7 +544,7 @@ if st.button("Suggest strategy", type="primary"):
         rationale_rule = ("Each *Rationale* must be **3 sentences totalling ≈ 60-90 words** – "
                           "1️⃣ logic, 2️⃣ quantitative context, 3️⃣ trade-offs.")
     stop_loss_str = "; ".join(
-        f"{ticker}: ${sl:.2f}" for ticker, sl in st.session_state.stop_loss_map.items() if pd.notnull(sl)
+        f"{ticker}: ${float(sl):.2f}" for ticker, sl in st.session_state.stop_loss_map.items() if pd.notnull(sl)
     ) or "None"
     prompt = textwrap.dedent(f"""
         Act as a **tactical hedging strategist**.
