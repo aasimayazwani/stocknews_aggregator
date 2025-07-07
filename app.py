@@ -389,11 +389,6 @@ st.markdown("Un-check any headline you **do not** want the LLM to consider:")
 # --------------------------------------------
 selected_risks = []
 
-# Generate dummy source links if needed
-risk_links = {
-    r: f"https://www.google.com/search?q={primary}+{r.replace(' ', '+')}" for r in risk_titles
-}
-
 # Begin the grid container
 st.markdown("<div class='risk-grid'>", unsafe_allow_html=True)
 
