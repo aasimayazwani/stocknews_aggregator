@@ -224,51 +224,67 @@ def fetch_prices(tickers: List[str], period="2d"):
     df = yf.download(tickers, period=period, progress=False)["Close"]
     return df.dropna(axis=1, how="all")
 
-@st.cache_data(ttl=900, show_spinner=False)
-def web_risk_scan(ticker: str) -> list[tuple[str, str]]:
-    """
-    Enhanced news-based risk scanner using NewsAPI,
-    looking for analyst-related and market-moving content.
-    Returns: List of (title, url) tuples.
-    """
-    import os
-    from datetime import datetime, timedelta
+import os
+import requests
+import streamlit as st
 
+@st.cache_data(ttl=900, show_spinner=False)
+def web_risk_scan(ticker: str):
+    """
+    Pulls analyst-related headlines for a given stock using NewsAPI.
+    Deduplicates results and filters for risk-related language or known analysts.
+    """
     api_key = st.secrets.get("NEWSAPI_KEY") or os.getenv("NEWSAPI_KEY")
     if not api_key:
-        return [("NEWSAPI key missing", "#")]
+        return [("⚠️ No NEWSAPI_KEY found. Please add it to .streamlit/secrets.toml", "#")]
 
-    query = f"{ticker} analyst OR earnings OR downgrade OR forecast OR target"
-    url = (
-        "https://newsapi.org/v2/everything?"
-        f"q={query}&"
-        "language=en&sortBy=publishedAt&pageSize=20&"
-        f"from={(datetime.now() - timedelta(days=14)).strftime('%Y-%m-%d')}&"
-        f"apiKey={api_key}"
-    )
+    # Build query for ticker + analyst-related terms
+    query = f'"{ticker}" AND (analyst OR downgrade OR rating OR earnings OR revise OR cut OR risk)'
+    url = "https://newsapi.org/v2/everything"
+    params = {
+        "q": query,
+        "language": "en",
+        "sortBy": "publishedAt",
+        "pageSize": 15,
+        "apiKey": api_key
+    }
 
     try:
-        resp = requests.get(url, timeout=10)
-        articles = resp.json().get("articles", [])
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        articles = response.json().get("articles", [])
     except Exception as e:
-        return [(f"News API error: {e}", "#")]
+        return [(f"❌ Error fetching headlines: {str(e)}", "#")]
 
-    known_analysts = {"Dan Ives", "Mark Mahaney", "Katy Huberty", "Gene Munster"}
-
+    known_analysts = ["Dan Ives", "Katy Huberty", "Gene Munster", "Mark Mahaney"]
+    seen_titles = set()
     risks = []
+
     for article in articles:
         title = article.get("title", "")
         url = article.get("url", "#")
-        if any(keyword in title.lower() for keyword in ["downgrade", "risk", "cut", "concern", "slashed", "fall", "caution", "bearish", "revised"]):
+
+        if not title or title in seen_titles:
+            continue  # Skip empty or duplicate titles
+
+        # Check for risk-related or analyst headlines
+        if any(keyword in title.lower() for keyword in [
+            "downgrade", "risk", "cut", "concern", "slashed", "fall", "caution", "bearish", "revised"
+        ]):
             risks.append((title, url))
+            seen_titles.add(title)
+
         elif any(analyst in title for analyst in known_analysts):
             risks.append((f"📊 Analyst: {title}", url))
+            seen_titles.add(title)
 
         if len(risks) >= 5:
             break
 
-    return risks or [(f"No relevant analyst headlines found for {ticker}.", "#")]
+    if not risks:
+        return [("No relevant analyst headlines found for " + ticker, "#")]
 
+    return risks
 
 # ─────────────────────────────── STATE ────────────────────────────────
 if "history"     not in st.session_state: st.session_state.history     = []
