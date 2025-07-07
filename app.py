@@ -224,43 +224,33 @@ def fetch_prices(tickers: List[str], period="2d"):
     return df.dropna(axis=1, how="all")
 
 @st.cache_data(ttl=900, show_spinner=False)
-def web_risk_scan(ticker: str, model_name: str = DEFAULT_MODEL) -> List[str]:
+def web_risk_scan(ticker: str, model_name: str = DEFAULT_MODEL) -> list[tuple[str, str]]:
     """
-    Return 5 concise risk headlines for `ticker` using NewsAPI.org
-    instead of an LLM.  Falls back to a placeholder if nothing found.
+    Returns up to 5 tuples: (headline, article_url)
     """
     api_key = "a9fd3ad7da454249af1ba008a644e423"
-    #api_key = st.secrets.get("NEWSAPI_KEY") or os.getenv("NEWSAPI_KEY")
+    api_key = st.secrets.get("NEWSAPI_KEY") or os.getenv("NEWSAPI_KEY")
     if not api_key:
-        return [  # Fail fast but don't crash the app
-            "⚠️  NEWSAPI_KEY not set – cannot fetch real headlines."
-        ]
+        return [("NEWSAPI key missing", "#")]
 
-    # Query latest English headlines mentioning the ticker symbol
-    url = (
-        "https://newsapi.org/v2/everything?"
-        f"q={ticker}&language=en&sortBy=publishedAt&pageSize=30&apiKey={api_key}"
-    )
+    url = ("https://newsapi.org/v2/everything?"
+           f"q={ticker}&language=en&sortBy=publishedAt&pageSize=30&apiKey={api_key}")
     try:
-        resp = requests.get(url, timeout=8)
-        resp.raise_for_status()
-        articles = resp.json().get("articles", [])
+        articles = requests.get(url, timeout=8).json().get("articles", [])
     except Exception as e:
-        return [f"News API error: {e}"]
+        return [(f"News API error: {e}", "#")]
 
-    # Quick-and-dirty heuristic ► keep sentences < 15 words
-    risks: list[str] = []
+    risks: list[tuple[str, str]] = []
+    bad_words = ("risk", "concern", "probe", "lawsuit", "slowdown",
+                 "regulation", "decline", "antitrust", "shortage", "recall")
     for art in articles:
         title = art.get("title", "")
-        # Very naive filter: look for bearish words
-        if any(kw in title.lower() for kw in ["risk", "concern", "probe", "lawsuit",
-                                              "slowdown", "regulation", "decline",
-                                              "antitrust", "shortage", "recall"]):
-            risks.append(title.split(" - ")[0])      # strip publisher suffix
-        if len(risks) >= 5:
+        if any(w in title.lower() for w in bad_words):
+            risks.append((title.split(" - ")[0], art.get("url", "#")))
+        if len(risks) == 5:
             break
 
-    return risks or [f"No fresh negative headlines found for {ticker}."]
+    return risks or [(f"No fresh negative headlines found for {ticker}.", "#")]
 
 # ─────────────────────────────── STATE ────────────────────────────────
 if "history"     not in st.session_state: st.session_state.history     = []
@@ -387,12 +377,9 @@ if primary not in st.session_state.risk_cache:
     with st.spinner("Scanning web…"):
         st.session_state.risk_cache[primary] = web_risk_scan(primary)
 
-risk_list = st.session_state.risk_cache[primary]
-selected_risks = st.session_state.get("selected_risks", risk_list)
-# Dummy mapping of risk → URL (replace with real scraping or LLM output if available)
-risk_links = {
-    r: f"https://www.google.com/search?q={primary}+{r.replace(' ', '+')}" for r in risk_list
-}
+risk_tuples = st.session_state.risk_cache[primary]      # output of web_risk_scan()
+risk_titles = [t[0] for t in risk_tuples]               # e.g. "FTC opens probe…"
+risk_links  = {title: url for title, url in risk_tuples}
 
 st.markdown("Un-check any headline you **do not** want the LLM to consider:")
 
@@ -409,30 +396,36 @@ risk_links = {
 # Begin the grid container
 st.markdown("<div class='risk-grid'>", unsafe_allow_html=True)
 
-# Render each risk in a styled card with checkbox + source
-for i, risk in enumerate(risk_list):
+# Render each risk in a styled card with checkbox + real source link
+for i, risk in enumerate(risk_titles):
     key = f"risk_{i}"
-    # Default all to checked unless already set
+    
+    # Set default checkbox state to True (checked) on first render
     if key not in st.session_state:
         st.session_state[key] = True
 
-    # Maintain checked state for each
+    # Read current state and reflect in HTML attribute
     checked_attr = "checked" if st.session_state[key] else ""
 
+    # Safely look up associated URL (fallback = "#")
+    link = risk_links.get(risk, "#")
+
+    # Render a styled checkbox card with clickable ℹ️ icon
     html = f"""
     <div class='risk-card'>
       <label for="{key}">
-        <input type="checkbox" id="{key}" name="{key}" onclick="window.dispatchEvent(new Event('input'))" {checked_attr}>
+        <input type="checkbox" id="{key}" name="{key}" {checked_attr}>
         <span>{risk}</span>
-        <a href="{risk_links[risk]}" target="_blank">ℹ️</a>
+        <a href="{link}" target="_blank">ℹ️</a>
       </label>
     </div>
     """
     st.markdown(html, unsafe_allow_html=True)
 
-    # Track which are still selected
+    # Track selected risks in session state
     if st.session_state[key]:
         selected_risks.append(risk)
+
 st.session_state.selected_risks = selected_risks
 # End the grid
 st.markdown("</div>", unsafe_allow_html=True)
