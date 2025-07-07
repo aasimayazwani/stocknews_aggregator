@@ -4,6 +4,7 @@ from __future__ import annotations
 import re, textwrap, requests
 from typing import List
 import requests
+import os
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -228,8 +229,8 @@ def web_risk_scan(ticker: str, model_name: str = DEFAULT_MODEL) -> list[tuple[st
     """
     Returns up to 5 tuples: (headline, article_url)
     """
-    api_key = "a9fd3ad7da454249af1ba008a644e423"
-    #api_key = st.secrets.get("NEWSAPI_KEY") or os.getenv("NEWSAPI_KEY")
+    #api_key = "a9fd3ad7da454249af1ba008a644e423"
+    api_key = st.secrets.get("NEWSAPI_KEY") or os.getenv("NEWSAPI_KEY")
     if not api_key:
         return [("NEWSAPI key missing", "#")]
 
@@ -390,7 +391,7 @@ selected_risks = []
 
 # Generate dummy source links if needed
 risk_links = {
-    r: f"https://www.google.com/search?q={primary}+{r.replace(' ', '+')}" for r in risk_list
+    r: f"https://www.google.com/search?q={primary}+{r.replace(' ', '+')}" for r in risk_titles
 }
 
 # Begin the grid container
