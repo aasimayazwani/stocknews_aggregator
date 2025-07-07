@@ -229,7 +229,7 @@ def web_risk_scan(ticker: str, model_name: str = DEFAULT_MODEL) -> list[tuple[st
     Returns up to 5 tuples: (headline, article_url)
     """
     api_key = "a9fd3ad7da454249af1ba008a644e423"
-    api_key = st.secrets.get("NEWSAPI_KEY") or os.getenv("NEWSAPI_KEY")
+    #api_key = st.secrets.get("NEWSAPI_KEY") or os.getenv("NEWSAPI_KEY")
     if not api_key:
         return [("NEWSAPI key missing", "#")]
 
