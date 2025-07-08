@@ -609,12 +609,12 @@ if st.session_state.avoid_dup_hedges:
 
     # ✅ Build final prompt
     prompt = textwrap.dedent(f"""
-        Act as a **tactical hedging strategist**.  Goal: *preserve capital* while keeping portfolio beta inside
-        **{beta_rng[0]:.2f}–{beta_rng[1]:.2f}**.  Follow this framework:
+        Act as a **tactical hedging strategist**.  
+        Goal: *preserve capital* while keeping portfolio beta inside **{beta_rng[0]:.2f}–{beta_rng[1]:.2f}**.
 
         {avoid_note}
 
-        ### Step-by-Step Reasoning
+        ### Step-by-Step Reasoning  
         1. **Identify Hedging Targets**  
         • Flag holdings with:  
             – Stop-loss ≥ 5 % above market price, or  
@@ -627,15 +627,14 @@ if st.session_state.avoid_dup_hedges:
 
         3. **Size Positions**  
         • Total hedge budget ≤ 15 % of capital (${total_capital:,.0f}).  
-        • Any *single* hedge ≤ 5 % of capital.  
+        • Any single hedge ≤ 5 % of capital.  
         • Rebalance to maintain target beta.
 
         4. **Cost Optimisation**  
         • Aim for option premium ≤ 3 % of notional per hedge.
 
         ---
-        **Context snapshot**
-
+        **Context snapshot**  
         • Basket: {', '.join(basket)}  
         • Allocation: {alloc_str}  
         • User stop-losses: {stop_loss_str}  
@@ -647,28 +646,35 @@ if st.session_state.avoid_dup_hedges:
         Experience: {st.session_state.experience_level} • Detail: {exp_pref} → {experience_note}
 
         ---
-        ### OUTPUT SPEC  (*Markdown only*)  
+        ### OUTPUT SPEC *(Markdown only — no tables, no code fences, no HTML)*  
 
-        | Ticker | Position | Amount ($) | Rationale | Source |
-        |--------|----------|------------|-----------|--------|
+        **Hedge list** — one numbered bullet per hedge, *exactly* like this template  
+        ```
+        1. **AAPL** — Put Option. Buy 3 × Aug $175 puts; buffers earnings-gap risk (≤ {rationale_rule}) [1]  
+        2. **MSFT** — Short via PSQ ETF. Offsets SaaS demand softness … [2]  
+        ```
+        (Your wording and tickers will differ, but keep the same bullet structure.)
 
-        • *One-line* rationale length rule → {rationale_rule}  
-        • If **options**, list: type / strike / expiry / premium / # contracts.  
-        • **Exactly one live URL** in *Source*. No extra text.
+        **Rules**  
+        • Each bullet must end with a reference marker like `[1]`.  
+        • {rationale_rule}  
+        • If an option, include strike / expiry / premium / # contracts.  
+        • Do **not** suggest tickers already in the user’s portfolio if diversification is required.  
+        • Limit to **5 hedges maximum**.
 
-        After the table add:  
-        1. `### Summary` (≤ 300 chars)  
-        2. `### Residual Risks` (≤ 25 words each, numbered, each ends with its own URL)
+        **Reference list** (immediately after the bullets, one per line)  
+        ```
+        [1] https://valid.source/for/aapl  
+        [2] https://another.source/example  
+        ```
 
-        ---
-        #### 📝 FORMAT EXAMPLE – reference only (do **NOT** copy)
-        | Ticker | Position | Amount ($) | Rationale | Source |
-        |--------|----------|------------|-----------|--------|
-        | AAPL | Put Option | 1,000 | Buy 3 × Aug $175 puts (≈ $2.30 / c) below $172 stop-loss; 1-mo earnings gap risk. **[1]** | https://finance.yahoo.com/quote/AAPL/options |
+        **After the references**, add:  
+        1. `### Summary` — ≤ 300 characters.  
+        2. `### Residual Risks` — numbered list, each risk ≤ 25 words **and** ending with its own URL.
 
-        ---
-        ❗ Final answer: plain Markdown (no code fences, no HTML).
+        ❗ Final answer: plain Markdown only.
     """).strip()
+
 
     # 2.  Call OpenAI -----------------------------------------------------------
     with st.spinner("Calling ChatGPT…"):
@@ -676,124 +682,87 @@ if st.session_state.avoid_dup_hedges:
 
     # 3.  Clean & show ----------------------------------------------------------
     plan_md = clean_md(raw_md)
-    
-        # Extract plan sections
-    plan_md_main = re.sub(r"### Residual Risks.*", "", plan_md, flags=re.I | re.S)
     st.subheader("📌 Suggested strategy")
 
-    # Instead of showing plan_md_main directly, parse & integrate the table
-    md_lines = plan_md_main.splitlines()
-    table_lines = [line for line in md_lines if '|' in line and not line.startswith('###')]
+    # ─────────────────────────────
+    # 🔍 Extract bullet rationale & footnotes
+    # ─────────────────────────────
+    lines = plan_md.splitlines()
+    hedge_lines = [line for line in lines if re.match(r"^\d+\.\s+\*\*.+\*\*", line)]
+    footnotes   = dict(re.findall(r"\[(\d+)\]\s+(https?://[^\s]+)", plan_md))
 
-    if len(table_lines) >= 3:
-        try:
-            import io
-
-            # STEP 1: Parse markdown table
-            table_str = '\n'.join(table_lines)
-            df = pd.read_csv(io.StringIO(table_str), sep='|')
-            df.columns = [c.strip() for c in df.columns]
-            df = df.dropna(subset=['Ticker', 'Amount ($)'])
-            df = df.dropna(how="all", axis=1)                       # remove unnamed first col if present
-            df = df[~df["Ticker"].str.contains(r"^-+|Ticker", na=False)]
-
-            # Clean amounts
-            df["Amount ($)"] = (
-                df["Amount ($)"]
-                .astype(str)
-                .str.replace("$", "")
-                .str.replace(",", "")
-                .str.extract(r"(\d+\.?\d*)")[0]
-                .astype(float)
-            )
-
-            # Add hedge table extras
-            df["Price"] = "_n/a_"
-            df["Δ 1d %"] = "_n/a_"
-            df["Source"] = "Suggested hedge"
-            total_amount = df["Amount ($)"].sum()
-            df["% of Portfolio"] = (df["Amount ($)"] / total_amount * 100).round(2)
-
-            # Now process user table
-            user_df = editor_df.copy()
-            user_df["Position"] = "Long"
-            user_df["Source"] = "User portfolio"
-            user_total = user_df["Amount ($)"].sum()
-            user_df["% of Portfolio"] = (user_df["Amount ($)"] / user_total * 100).round(2)
-            user_df["Rationale"] = "—"
-            user_df["Ticker"] = user_df["Ticker"].astype(str)
-
-                    # 🔄 Align columns for merging
-            # Define base columns
-            user_cols  = ["Ticker", "Position", "Amount ($)", "% of Portfolio", "Price", "Δ 1d %", "Source"]
-            hedge_cols = user_cols + ["Rationale"]
-
-            # 1️⃣ Keep hedge_df as is (includes rationale)
-            df = df[hedge_cols]
-
-            # 2️⃣ Prepare user_df (exclude rationale from display)
-            user_df = user_df[user_cols].copy()
-
-            # 3️⃣ Add empty rationale column for alignment only
-            user_df["Rationale"] = ""
-
-            # 4️⃣ Final unified ordering
-            final_cols = hedge_cols
-            user_df = user_df[final_cols]
-            df = df[final_cols]
-
-            # ✅ Store in session state
-            st.session_state.user_df = user_df
-            st.session_state.strategy_history.append({
-                "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "horizon": horizon,
-                "beta_band": beta_rng,
-                "capital": total_capital,
-                "strategy_df": df,
-                "rationale_md": plan_md,  # full rationale markdown
+    records = []
+    for line in hedge_lines:
+        match = re.match(r"^(\d+)\.\s+\*\*(.+?)\*\*\s+—\s+(.*?)\s+\[(\d+)\]", line)
+        if match:
+            _, ticker, rationale, ref_id = match.groups()
+            url = footnotes.get(ref_id, "#")
+            records.append({
+                "Ticker": ticker.strip(),
+                "Rationale": rationale.strip(),
+                "Source": url,
+                "Position": "Hedge",
+                "Amount ($)": 0
             })
 
-            # 📌 Combine for final rendering (if needed)
-            combined_df = pd.concat([user_df, df], ignore_index=True)
-            display_df = combined_df.drop(columns=["Rationale"])
-            st.dataframe(display_df, use_container_width=True)
-            #st.session_state.combined_df = combined_df
+    df = pd.DataFrame(records)
 
-            # ✅ Guard in case data becomes stale or corrupted
-            if combined_df.empty:
-                st.warning("Combined hedge strategy is empty. Please re-generate.")
-            else:
-                pass
-                #st.dataframe(combined_df, use_container_width=True)
+    # 📌 User table (from editor)
+    user_df = editor_df.copy()
+    user_df["Position"] = "Long"
+    user_df["Source"] = "User portfolio"
+    user_df["% of Portfolio"] = (user_df["Amount ($)"] / user_df["Amount ($)"].sum() * 100).round(2)
+    user_df["Rationale"] = "—"
+    user_df["Ticker"] = user_df["Ticker"].astype(str)
 
+    # 🧮 Optional: combine user + hedge tables
+    df["% of Portfolio"] = 0
+    df["Price"] = "_n/a_"
+    df["Δ 1d %"] = "_n/a_"
+    user_df["Price"] = user_df["Price"].round(2)
+    user_df["Δ 1d %"] = user_df["Δ 1d %"].round(2)
 
-            with st.sidebar:
-                if st.checkbox("📊 Show Post-Hedge Pie Chart", value=False, key="sidebar_post_hedge_pie"):
-                    st.markdown("#### 🧮 Post-Hedge Allocation")
-                    pie_df = combined_df.copy()
-                    pie_df["Label"] = pie_df["Ticker"] + " (" + pie_df["Position"] + ")"
-                    pie_df["Amount"] = pie_df["Amount ($)"]
-                    st.plotly_chart(
-                        px.pie(
-                            pie_df,
-                            names="Label",
-                            values="Amount",
-                            hole=0.3
-                        ).update_traces(textinfo="label+percent"),
-                        use_container_width=True
-                    )
+    final_cols = ["Ticker", "Position", "Amount ($)", "% of Portfolio", "Price", "Δ 1d %", "Source", "Rationale"]
+    user_df = user_df[final_cols]
+    df = df[final_cols]
 
-        except Exception as e:
-            st.warning(f"Could not parse or merge hedge table: {e}")
+    combined_df = pd.concat([user_df, df], ignore_index=True)
 
-        # 🔍 📌 Hedge Strategy Rationale (dynamic, styled, and link-aware)
+    # ✅ Store in session state
+    st.session_state.user_df = user_df
+    st.session_state.strategy_df = df
+    st.session_state.rationale_md = plan_md
+    st.session_state.strategy_history.append({
+        "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "horizon": horizon,
+        "beta_band": beta_rng,
+        "capital": total_capital,
+        "strategy_df": df,
+        "rationale_md": plan_md,
+    })
+
+    # 📊 Post-hedge allocation (optional chart)
+    st.dataframe(combined_df.drop(columns=["Rationale"]), use_container_width=True)
+
+    with st.sidebar:
+        if st.checkbox("📊 Show Post-Hedge Pie Chart", value=False, key="sidebar_post_hedge_pie"):
+            st.markdown("#### 🧮 Post-Hedge Allocation")
+            pie_df = combined_df.copy()
+            pie_df["Label"] = pie_df["Ticker"] + " (" + pie_df["Position"] + ")"
+            pie_df["Amount"] = pie_df["Amount ($)"]
+            st.plotly_chart(
+                px.pie(
+                    pie_df,
+                    names="Label",
+                    values="Amount",
+                    hole=0.3
+                ).update_traces(textinfo="label+percent"),
+                use_container_width=True
+            )
+
+    # ✅ Markdown rationale display (not the table)
     st.markdown("### 📌 Hedge Strategy Rationale")
-
-    hedge_df = st.session_state.get("strategy_df")   # <— safe fetch
-    if hedge_df is None or hedge_df.empty:
-        st.info("No hedge rationale to show.")
-    else:
-        render_rationale(hedge_df)  
+    st.markdown(plan_md)
 
 # ─────────────────────────────── STRATEGY HISTORY ───────────────────────────────
 st.markdown("### 🕘 Previous Strategies")
