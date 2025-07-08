@@ -574,26 +574,53 @@ stop_loss_str = "; ".join(
     f"{ticker}: ${float(sl):.2f}" for ticker, sl in st.session_state.stop_loss_map.items() if pd.notnull(sl)
 ) or "None"
 avoid_note = ""
+# ─── Collect all required vars BEFORE prompt ─────────────────────────────
+risk_string = ", ".join(risk_titles) or "None"
+ignored = "; ".join(st.session_state.risk_ignore) or "None"
+stop_loss_str = "; ".join(
+    f"{ticker}: ${float(sl):.2f}" for ticker, sl in st.session_state.stop_loss_map.items() if pd.notnull(sl)
+) or "None"
+total_capital = sum(st.session_state.portfolio_alloc.values())
+alloc_str = "; ".join(f"{k}: ${v:,.0f}" for k, v in st.session_state.portfolio_alloc.items()) or "None"
+
+experience_note = {
+    "Beginner":     "Use plain language and define jargon the first time you use it.",
+    "Intermediate": "Assume working knowledge of finance; keep explanations concise.",
+    "Expert":       "Write in professional sell-side style; no hand-holding.",
+}[st.session_state.experience_level]
+
+exp_pref = st.session_state.explanation_pref
+if exp_pref == "Just the strategy":
+    rationale_rule = "Each *Rationale* must be **≤ 25 words (one sentence)**."
+elif exp_pref == "Explain the reasoning":
+    rationale_rule = ("Each *Rationale* must be **2 sentences totalling ≈ 30-50 words** "
+                      "(logic + risk linkage).")
+else:  # Both
+    rationale_rule = ("Each *Rationale* must be **3 sentences totalling ≈ 60-90 words** – "
+                      "1️⃣ logic, 2️⃣ quantitative context, 3️⃣ trade-offs.")
+
+# ❌ Diversification toggle
+avoid_note = ""
 if st.session_state.avoid_dup_hedges:
     avoid_note = (
-        "- ❌ **Do NOT suggest hedge instruments that appear in the user's current portfolio** "
+        "- ❌ **Do NOT suggest hedge instruments already in the user’s portfolio** "
         f"({', '.join(st.session_state.portfolio)}).\n"
-        "- ✅ Offer diversifiers instead (sector ETFs, index futures, inverse ETFs, pair-trades, cash, rates, FX, commodities).\n"
+        "- ✅ Prefer diversifiers (sector ETFs, index futures, inverse ETFs, FX, commodities).\n"
     )
 
-    # 2️⃣  Main prompt
+    # ✅ Build final prompt
     prompt = textwrap.dedent(f"""
         Act as a **tactical hedging strategist**.  Goal: *preserve capital* while keeping portfolio beta inside
         **{beta_rng[0]:.2f}–{beta_rng[1]:.2f}**.  Follow this framework:
 
-        {avoid_note}  <!-- injected diversification rule -->
+        {avoid_note}
 
         ### Step-by-Step Reasoning
         1. **Identify Hedging Targets**  
-        • Flag holdings with  
+        • Flag holdings with:  
             – Stop-loss ≥ 5 % above market price, or  
-            – High sensitivity to headline risks: {risk_string or "None"}.  
-        • Ignore: {ignored or "None"}  
+            – High sensitivity to headline risks: {risk_string}.  
+        • Ignore: {ignored}  
 
         2. **Select Instruments**  
         • Primary: **Put options** (strike ≤ stop-loss – 2 %; expiry {horizon} ± 0.5 mo).  
@@ -612,7 +639,7 @@ if st.session_state.avoid_dup_hedges:
 
         • Basket: {', '.join(basket)}  
         • Allocation: {alloc_str}  
-        • User stop-losses: {stop_loss_str or 'None'}  
+        • User stop-losses: {stop_loss_str}  
         • Horizon: {horizon} mo  
         • Total capital: ${total_capital:,.0f}  
         • Portfolio stop-loss buffer (shorts): {stop_loss}%  
@@ -643,9 +670,6 @@ if st.session_state.avoid_dup_hedges:
         ---
         ❗ Final answer: plain Markdown (no code fences, no HTML).
     """).strip()
-
-
-
 
     # 2.  Call OpenAI -----------------------------------------------------------
     with st.spinner("Calling ChatGPT…"):
