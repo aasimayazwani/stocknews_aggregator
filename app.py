@@ -303,6 +303,10 @@ with st.sidebar.expander("⚙️  Settings"):
 with st.sidebar.expander("🕒 Investment settings", expanded=True):
     primary = st.selectbox("🎯 Focus stock", st.session_state.portfolio, 0, key="focus_stock")
     horizon = st.slider("⏳ Time horizon (months)", 1, 24, 6, key="horizon_slider")
+    avoid_duplicate_hedges = st.checkbox("❌ Avoid suggesting same stocks in hedge", value=True)
+
+# Store in session state
+st.session_state.avoid_dup_hedges = avoid_duplicate_hedges
 
 # 🎯 basket computation moved below
 others  = [t for t in st.session_state.portfolio if t != primary]
@@ -560,87 +564,81 @@ if st.button("Suggest strategy", type="primary"):
     stop_loss_str = "; ".join(
         f"{ticker}: ${float(sl):.2f}" for ticker, sl in st.session_state.stop_loss_map.items() if pd.notnull(sl)
     ) or "None"
+    # --------------------------------------------
+# 🔧  BUILD FINAL PROMPT STRING
+# --------------------------------------------
+# 1️⃣  Optional note to stop the model from re-using portfolio tickers
+avoid_note = ""
+if st.session_state.avoid_dup_hedges:
+    avoid_note = (
+        "- ❌ **Do NOT suggest hedge instruments that appear in the user's current portfolio** "
+        f"({', '.join(st.session_state.portfolio)}).\n"
+        "- ✅ Offer diversifiers instead (sector ETFs, index futures, inverse ETFs, pair-trades, cash, rates, FX, commodities).\n"
+    )
+
+    # 2️⃣  Main prompt
     prompt = textwrap.dedent(f"""
-        Act as a **tactical hedging strategist**. Prioritize capital preservation while staying within the beta band. Use this workflow:
+        Act as a **tactical hedging strategist**.  Goal: *preserve capital* while keeping portfolio beta inside
+        **{beta_rng[0]:.2f}–{beta_rng[1]:.2f}**.  Follow this framework:
+
+        {avoid_note}  <!-- injected diversification rule -->
 
         ### Step-by-Step Reasoning
-        1. **Identify Hedging Targets**:  
-        - Flag assets with:  
-            - Stop-loss levels ≥ 5% above current price  
-            - High sensitivity to headline risks: {risk_string or "None"}  
-        - Ignore: {ignored or "None"}  
+        1. **Identify Hedging Targets**  
+        • Flag holdings with  
+            – Stop-loss ≥ 5 % above market price, or  
+            – High sensitivity to headline risks: {risk_string or "None"}.  
+        • Ignore: {ignored or "None"}  
 
-        2. **Select Instruments**:  
-        - Use **put options** for direct downside protection.  
-            - Strike: At or **max 2% below** user’s stop-loss.  
-            - Expiration: **{horizon} months ± 2 weeks**.  
-        - Use **short positions** only for assets with stop-loss buffer ({stop_loss}%).  
+        2. **Select Instruments**  
+        • Primary: **Put options** (strike ≤ stop-loss – 2 %; expiry {horizon} ± 0.5 mo).  
+        • Secondary: **Shorts / inverse ETFs / futures** only if stop-loss buffer ≥ {stop_loss} %.  
 
-        3. **Size Positions**:  
-        - Allocate **≤15% of total capital** (${total_capital:,.0f}) to hedging.  
-        - Ensure portfolio beta remains **{beta_rng[0]:.2f}–{beta_rng[1]:.2f}** (rebalance if needed).  
+        3. **Size Positions**  
+        • Total hedge budget ≤ 15 % of capital (${total_capital:,.0f}).  
+        • Any *single* hedge ≤ 5 % of capital.  
+        • Rebalance to maintain target beta.
 
-        4. **Cost Optimization**:  
-        - Target options premiums **≤3% of notional value** per hedge.  
-
-
-        • **Basket**: {', '.join(basket)}
-        • **Current allocation**: {alloc_str}
-        • **Total capital**: ${total_capital:,.0f}
-        • **User-defined stop-loss levels**: {stop_loss_str}
-        • **Horizon**: {horizon} months
-        • **Beta band**: {beta_rng[0]:.2f}–{beta_rng[1]:.2f}
-        • **Portfolio-level stop-loss buffer** (shorts only): {stop_loss} %
-        • **Detected headline risks for {primary}**: {risk_string or 'None'}
-        • **Ignore**: {ignored or 'None'}
-
-        ### Investor profile
-        Experience: {st.session_state.experience_level}   •  Detail level: {exp_pref}
-        → {experience_note}
+        4. **Cost Optimisation**  
+        • Aim for option premium ≤ 3 % of notional per hedge.
 
         ---
-        ### OUTPUT SPEC — *Markdown only*
+        **Context snapshot**
+
+        • Basket: {', '.join(basket)}  
+        • Allocation: {alloc_str}  
+        • User stop-losses: {stop_loss_str or 'None'}  
+        • Horizon: {horizon} mo  
+        • Total capital: ${total_capital:,.0f}  
+        • Portfolio stop-loss buffer (shorts): {stop_loss}%  
+
+        ### Investor profile  
+        Experience: {st.session_state.experience_level} • Detail: {exp_pref} → {experience_note}
+
+        ---
+        ### OUTPUT SPEC  (*Markdown only*)  
 
         | Ticker | Position | Amount ($) | Rationale | Source |
         |--------|----------|------------|-----------|--------|
 
-        **Rationale requirements**  
-        {rationale_rule}
-
-        **If an entry uses options, you must include all five bullet-points below**  
-        1. **Option type** (Put/Call)  
-        2. **Strike price** (⚠️ *at or just below the user’s stop-loss level*)  
-        3. **Expiration date** (e.g. *16 Aug 2025, 30 DTE*)  
-        4. **Approx. premium per contract** (USD)  
-        5. **# Contracts** (justify sizing vs. underlying notional)  
-
-        End every rationale with a citation tag like **[1]** that matches the URL in *Source*.
-
-        *Source* column = exactly one live, clickable URL per row—no extra text.
+        • *One-line* rationale length rule → {rationale_rule}  
+        • If **options**, list: type / strike / expiry / premium / # contracts.  
+        • **Exactly one live URL** in *Source*. No extra text.
 
         After the table add:  
-        1. `### Summary` — ≤ 300 chars.  
-        2. `### Residual Risks` — numbered list, ≤ 25 words each, each ending with its own URL.
+        1. `### Summary` (≤ 300 chars)  
+        2. `### Residual Risks` (≤ 25 words each, numbered, each ends with its own URL)
 
         ---
-        #### 📝 FORMAT EXAMPLE – FOR REFERENCE ONLY (DO NOT copy verbatim)
-
+        #### 📝 FORMAT EXAMPLE – reference only (do **NOT** copy)
         | Ticker | Position | Amount ($) | Rationale | Source |
         |--------|----------|------------|-----------|--------|
-        | AAPL | **Put Option** | 1,000 | Buy 3 × Aug $175 puts (≈ $2.30 / c) to cap downside below $172 stop-loss; 1-month horizon aligns with earnings gap risk. **[1]** | https://finance.yahoo.com/quote/AAPL/options |
-        | MSFT | Long | 9,000 | Maintain core stake; minor trim funds puts while preserving upside vs. AI catalysts. **[2]** | https://www.cnbc.com/2025/07/01/microsoft-ai-outlook.html |
+        | AAPL | Put Option | 1,000 | Buy 3 × Aug $175 puts (≈ $2.30 / c) below $172 stop-loss; 1-mo earnings gap risk. **[1]** | https://finance.yahoo.com/quote/AAPL/options |
 
-        ### Summary  
-        Suggests tight put hedges at strikes just under stop-losses; retains core upside while capping downside to –5 %.
-
-        ### Residual Risks  
-        1. Vol crush reduces hedge efficacy if implied vols retrace. https://www.cboe.com  
-        2. Macro shock may breach put strikes before adjustment window. https://www.federalreserve.gov
         ---
+        ❗ Final answer: plain Markdown (no code fences, no HTML).
+    """).strip()
 
-        Use the above example **only** to mirror structure, level of detail, and option specificity.  
-        ❗ Absolutely **do not** wrap your final answer in code fences or quotes.
-        """).strip()
 
 
 
