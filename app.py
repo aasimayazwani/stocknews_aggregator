@@ -803,24 +803,6 @@ else:
             st.dataframe(run["strategy_df"], use_container_width=True)
             st.markdown(run["rationale_md"])
 
-# ─────────────────────────── OPTIONAL CHARTS ─────────────────────────
-show_charts = st.checkbox("Show Price Comparison Chart", value=True)
-
-if show_charts:
-    st.markdown("### 📈  Price comparison")
-    duration = st.selectbox("Duration", ["1mo", "3mo", "6mo", "1y"], 2)
-    plot_tickers = st.multiselect("Tickers to plot", basket + ["SPY"], basket)
-    if "SPY" not in plot_tickers: plot_tickers.append("SPY")
-    chart_df = fetch_prices(plot_tickers, duration)
-    if chart_df.empty:
-        st.error("No price data.")
-    else:
-        st.plotly_chart(
-            px.line(chart_df, title=f"Adjusted close ({duration})",
-                    labels={"value": "Price", "variable": "Ticker"}),
-            use_container_width=True,
-        )
-
 # ───────────────────────────── QUICK CHAT ────────────────────────────
 st.divider()
 st.markdown("### 💬  Quick chat")
