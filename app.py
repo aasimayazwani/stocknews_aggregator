@@ -680,33 +680,27 @@ if st.session_state.avoid_dup_hedges:
     with st.spinner("Calling ChatGPT…"):
         raw_md = ask_openai(model, "You are a precise, citation-rich strategist.", prompt)
 
-    # 3.  Clean & show ----------------------------------------------------------
-    #plan_md = clean_md(raw_md)
     plan_md = raw_md
-    # Replace plain [1] with markdown links [¹](url)
-    lines = plan_md.splitlines()
-    hedge_lines = [line for line in lines if re.match(r"^\d+\.\s+\*\*.+\*\*", line)]
 
-    # Extract numbered footnotes: [1] https://...
+    # Extract footnotes once: [1] https://...
     footnotes = dict(re.findall(r"\[(\d+)\]\s+(https?://[^\s]+)", plan_md))
 
-    # Replace [1], [2], etc. with markdown-embedded links [🔗¹](url)
+    # Replace [1], [2], etc. with markdown-embedded superscript links
+    superscripts_map = "⁰¹²³⁴⁵⁶⁷⁸⁹"
     for ref_id, url in footnotes.items():
-        superscripts = "⁰¹²³⁴⁵⁶⁷⁸⁹"
-        superscript = "".join(superscripts[int(d)] for d in ref_id)  # handle 10+ like "¹⁰"
+        superscript = "".join(superscripts_map[int(d)] for d in ref_id)
         plan_md = plan_md.replace(f"[{ref_id}]", f"[🔗{superscript}]({url})")
 
-    # Optional: remove raw footnote lines from bottom of markdown
+    # Remove raw footnote lines like: [1] https://...
     plan_md = re.sub(r"^\[\d+\]\s+https?://[^\s]+", "", plan_md, flags=re.MULTILINE)
 
-    st.subheader("📌 Suggested strategy")
-
-    # ─────────────────────────────
-    # 🔍 Extract bullet rationale & footnotes
-    # ─────────────────────────────
+    # Define hedge_lines for downstream use
     lines = plan_md.splitlines()
     hedge_lines = [line for line in lines if re.match(r"^\d+\.\s+\*\*.+\*\*", line)]
-    footnotes   = dict(re.findall(r"\[(\d+)\]\s+(https?://[^\s]+)", plan_md))
+
+    # Display strategy
+    st.subheader("📌 Suggested strategy")
+
 
     records = []
     for line in hedge_lines:
