@@ -600,7 +600,6 @@ else:  # Both
                       "1️⃣ logic, 2️⃣ quantitative context, 3️⃣ trade-offs.")
 
 # ❌ Diversification toggle
-avoid_note = ""
 if st.session_state.avoid_dup_hedges:
     avoid_note = (
         "- ❌ **Do NOT suggest hedge instruments already in the user’s portfolio** "
