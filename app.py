@@ -681,7 +681,8 @@ if st.session_state.avoid_dup_hedges:
         raw_md = ask_openai(model, "You are a precise, citation-rich strategist.", prompt)
 
     # 3.  Clean & show ----------------------------------------------------------
-    plan_md = clean_md(raw_md)
+    #plan_md = clean_md(raw_md)
+    plan_md = raw_md
     st.subheader("📌 Suggested strategy")
 
     # ─────────────────────────────
@@ -693,7 +694,8 @@ if st.session_state.avoid_dup_hedges:
 
     records = []
     for line in hedge_lines:
-        match = re.match(r"^(\d+)\.\s+\*\*(.+?)\*\*\s+—\s+(.*?)\s+\[(\d+)\]", line)
+        #match = re.match(r"^(\d+)\.\s+\*\*(.+?)\*\*\s+—\s+(.*?)\s+\[(\d+)\]", line)
+        match = re.match(r"^(\d+)\.\s+(?:\*\*)?(.+?)(?:\*\*)?\s+—\s+(.*?)\s+\[(\d+)\]", line)
         if match:
             _, ticker, rationale, ref_id = match.groups()
             url = footnotes.get(ref_id, "#")
