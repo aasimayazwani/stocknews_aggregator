@@ -568,6 +568,8 @@ if st.button("Suggest strategy", type="primary"):
 # 🔧  BUILD FINAL PROMPT STRING
 # --------------------------------------------
 # 1️⃣  Optional note to stop the model from re-using portfolio tickers
+risk_string = ", ".join(risk_titles) or "None"
+
 avoid_note = ""
 if st.session_state.avoid_dup_hedges:
     avoid_note = (
