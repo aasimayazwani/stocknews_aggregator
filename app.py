@@ -804,6 +804,8 @@ else:
             st.markdown(run["rationale_md"])
 
 # ─────────────────────────── OPTIONAL CHARTS ─────────────────────────
+show_charts = st.checkbox("Show Price Comparison Chart", value=True)
+
 if show_charts:
     st.markdown("### 📈  Price comparison")
     duration = st.selectbox("Duration", ["1mo", "3mo", "6mo", "1y"], 2)
