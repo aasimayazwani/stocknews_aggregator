@@ -494,25 +494,6 @@ st.markdown("</div>", unsafe_allow_html=True)
 # Update the exclusion list in session state
 st.session_state.risk_ignore = [r for r in risk_titles if r not in selected_risks]
 
-#st.session_state.risk_ignore = [r for r in risk_list if r not in exclude]
-
-# ───────────────────────── SIDEBAR – OUTLOOK ─────────────────────────
-with st.sidebar.expander("🔮  Quarterly outlook"):
-    if st.button("↻  Refresh forecast"): st.session_state.outlook_md = None
-    if st.session_state.outlook_md is None:
-        st.session_state.outlook_md = "Generating…"; st.rerun()
-    elif st.session_state.outlook_md == "Generating…":
-        p = (
-            f"Provide EPS and total-revenue forecasts for {primary}'s next quarter; "
-            f"include Street consensus and beat probability (in %). End with 'Source: …'. "
-            f"Return markdown (table + bullets)."
-        )
-        md = ask_openai(model, "You are a senior hedge fund analyst.", p)
-        st.session_state.outlook_md = clean_md(md); st.rerun()
-    else:
-        st.markdown(f"<div class='card'>{st.session_state.outlook_md}</div>", unsafe_allow_html=True)
-
-
 # investor profile
 # ▶️  right after st.sidebar.expander("⚙️  Settings"):
 with st.sidebar.expander("🧑‍💼  Investor profile", expanded=True):
