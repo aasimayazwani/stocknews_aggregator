@@ -742,8 +742,12 @@ if st.session_state.avoid_dup_hedges:
 
     final_cols = ["Ticker", "Position", "Amount ($)", "% of Portfolio", "Price", "Δ 1d %", "Source", "Rationale"]
     user_df = user_df[final_cols]
-    df = df[final_cols]
+    missing_cols = [col for col in final_cols if col not in df.columns]
+    for col in missing_cols:
+        df[col] = ""  # fill with empty strings
 
+    # Now safe to reorder
+    df = df[final_cols]
     combined_df = pd.concat([user_df, df], ignore_index=True)
 
     # ✅ Store in session state
