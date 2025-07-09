@@ -564,7 +564,7 @@ with col2:
 #horizon      = st.slider("Time horizon (months)", 1, 24, 6)
 
 # Strategy generation & rendering
-if st.button("Suggest strategy", type="primary"):
+if suggest_clicked:
     # 1. Collect context values
     ignored = "; ".join(st.session_state.risk_ignore) or "None"
     total_capital = sum(st.session_state.portfolio_alloc.values())
