@@ -502,6 +502,12 @@ with st.sidebar.expander("🧑‍💼  Investor profile", expanded=True):
 st.session_state.experience_level  = experience_level
 st.session_state.explanation_pref  = explanation_pref
 
+experience_to_default = {
+    "Beginner": ["Inverse ETFs", "Commodities"],
+    "Intermediate": ["Put Options", "Inverse ETFs", "Commodities"],
+    "Expert": ["Put Options", "Collar Strategy", "Inverse ETFs", "Short Selling", "Volatility Hedges", "Commodities", "FX Hedges"]
+}
+
 default_instruments = experience_to_default.get(st.session_state.experience_level, [])
 
 # Sidebar: Hedge instruments based on experience
