@@ -323,17 +323,6 @@ if "risk_cache"  not in st.session_state: st.session_state.risk_cache  = {}
 if "risk_ignore" not in st.session_state: st.session_state.risk_ignore = []
 
 # ────────────────────────── SIDEBAR – SETTINGS ───────────────────────
-with st.sidebar.expander("⚙️  Settings"):
-    if st.button("🧹  Clear chat history"):  st.session_state.history = []
-    if st.button("🗑️  Clear portfolio"):    st.session_state.portfolio = []
-    model = DEFAULT_MODEL
-
-# fix duplicate ID bug by giving a key to each sidebar widget
-with st.sidebar.expander("🕒 Investment settings", expanded=True):
-    primary = st.selectbox("🎯 Focus stock", st.session_state.portfolio, 0, key="focus_stock")
-    horizon = st.slider("⏳ Time horizon (months)", 1, 24, 6, key="horizon_slider")
-    avoid_duplicate_hedges = st.checkbox("❌ Avoid suggesting same stocks in hedge", value=True)
-
 # 🛡️ Hedge instrument defaults by experience
 experience_to_default = {
     "Beginner": ["Inverse ETFs", "Commodities"],
@@ -521,11 +510,6 @@ st.markdown("</div>", unsafe_allow_html=True)
 # Update the exclusion list in session state
 st.session_state.risk_ignore = [r for r in risk_titles if r not in selected_risks]
 
-# investor profile
-# ▶️  right after st.sidebar.expander("⚙️  Settings"):
-with st.sidebar.expander("🧑‍💼  Investor profile", expanded=True):
-    experience_level   = st.radio("Experience",   ["Beginner", "Intermediate", "Expert"])
-    explanation_pref   = st.radio("Detail level", ["Just the strategy", "Explain the reasoning", "Both"])
 
 # 🔄  Store & show sticky pill
 st.session_state.experience_level  = experience_level
@@ -540,15 +524,6 @@ experience_to_default = {
 default_instruments = experience_to_default.get(st.session_state.experience_level, [])
 
 # Sidebar: Hedge instruments based on experience
-
-with st.sidebar.expander("🛡️ Allowed Hedge Instruments", expanded=True):
-    allowed_instruments = st.multiselect(
-        "Choose hedge instruments to include",
-        ["Put Options", "Collar Strategy", "Inverse ETFs", "Short Selling", "Volatility Hedges", "Commodities", "FX Hedges"],
-        default=default_instruments,
-        help="Uncheck any hedge types you do not want the LLM to suggest."
-    )
-st.session_state.allowed_instruments = allowed_instruments
 
 if "strategy_history" not in st.session_state:
     st.session_state.strategy_history = []
@@ -568,21 +543,6 @@ st.markdown("### 📝  Strategy Designer")
 #avoid_sym    = st.text_input("Hedge / avoid ticker", primary)
 #capital      = st.number_input("Capital (USD)", 1000, 1_000_000, 10_000, 1000)
 #horizon      = st.slider("Time horizon (months)", 1, 24, 6)
-
-with st.sidebar.expander("⚖️ Risk controls", expanded=True):
-    beta_rng  = st.slider("Beta match band", 0.5, 1.5, (0.8, 1.2), 0.05, key="beta_band")
-    stop_loss = st.slider("Stop-loss for shorts (%)", 1, 20, 10, key="stop_loss_slider")
-
-# Sidebar – Hedge budget
-with st.sidebar.expander("💵 Hedge budget", expanded=True):
-    hedge_budget_pct = st.slider(
-        "Total hedge budget (%% of capital)",
-        5, 25, 15, 1, key="hedge_budget_pct"
-    )
-    single_hedge_pct = st.slider(
-        "Max per single hedge (%% of capital)",
-        1, 10, 5, 1, key="single_hedge_pct"
-    )
 
 # Strategy generation & rendering
 if st.button("Suggest strategy", type="primary"):
