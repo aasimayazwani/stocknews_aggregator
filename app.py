@@ -505,6 +505,7 @@ with st.sidebar.expander("🔍 Key headline risks", expanded=True):
     st.session_state.selected_risks = selected_risks
     st.session_state.risk_ignore = [r for r in risk_titles if r not in selected_risks]
 
+
 # 🔄  Store & show sticky pill
 #st.session_state.experience_level  = experience_level
 #st.session_state.explanation_pref  = explanation_pref
