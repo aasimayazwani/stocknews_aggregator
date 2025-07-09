@@ -474,63 +474,36 @@ ticker_df["Label"] = (
 # 10. Save final list
 portfolio = st.session_state.portfolio
 
-# ────────────────────── AUTOMATED RISK SCAN SECTION ───────────────────
-st.markdown("### 🔍  Key headline risks")
-if primary not in st.session_state.risk_cache:
-    with st.spinner("Scanning web…"):
-        st.session_state.risk_cache[primary] = web_risk_scan(primary)
+# ────────────────────── SIDEBAR: Key Headline Risks ──────────────────────
+with st.sidebar.expander("🔍 Key headline risks", expanded=True):
+    if primary not in st.session_state.risk_cache:
+        with st.spinner("Scanning web…"):
+            st.session_state.risk_cache[primary] = web_risk_scan(primary)
 
+    risk_tuples = st.session_state.risk_cache[primary]
+    risk_titles = [t[0] for t in risk_tuples]
+    risk_links = {title: url for title, url in risk_tuples}
 
+    selected_risks = []
 
-risk_tuples = st.session_state.risk_cache[primary]      # output of web_risk_scan()
-risk_titles = [t[0] for t in risk_tuples]               # e.g. "FTC opens probe…"
-risk_links  = {title: url for title, url in risk_tuples}
+    for i, risk in enumerate(risk_titles):
+        key = f"risk_{i}"
+        default = True if key not in st.session_state else st.session_state[key]
 
-# --------------------------------------------
-# 🧠 2-Column Responsive Risk Rendering Section
-# --------------------------------------------
-selected_risks = []
+        # Render checkbox with link inline
+        cols = st.columns([0.1, 0.8, 0.1])  # [checkbox] [title] [ℹ️]
+        with cols[0]:
+            st.session_state[key] = st.checkbox("", key=key, value=default)
+        with cols[1]:
+            st.markdown(risk)
+        with cols[2]:
+            st.markdown(f"[ℹ️]({risk_links.get(risk, '#')})")
 
-# Begin the grid container
-st.markdown("<div class='risk-grid'>", unsafe_allow_html=True)
+        if st.session_state[key]:
+            selected_risks.append(risk)
 
-# Render each risk in a styled card with checkbox + real source link
-for i, risk in enumerate(risk_titles):
-    key = f"risk_{i}"
-    
-    # Set default checkbox state to True (checked) on first render
-    if key not in st.session_state:
-        st.session_state[key] = True
-
-    # Read current state and reflect in HTML attribute
-    checked_attr = "checked" if st.session_state[key] else ""
-
-    # Safely look up associated URL (fallback = "#")
-    link = risk_links.get(risk, "#")
-
-    # Render a styled checkbox card with clickable ℹ️ icon
-    html = f"""
-    <div class='risk-card'>
-      <label for="{key}">
-        <input type="checkbox" id="{key}" name="{key}" {checked_attr}>
-        <span>{risk}</span>
-        <a href="{link}" target="_blank">ℹ️</a>
-      </label>
-    </div>
-    """
-    st.markdown(html, unsafe_allow_html=True)
-
-    # Track selected risks in session state
-    if st.session_state[key]:
-        selected_risks.append(risk)
-
-st.session_state.selected_risks = selected_risks
-# End the grid
-st.markdown("</div>", unsafe_allow_html=True)
-
-# Update the exclusion list in session state
-st.session_state.risk_ignore = [r for r in risk_titles if r not in selected_risks]
-
+    st.session_state.selected_risks = selected_risks
+    st.session_state.risk_ignore = [r for r in risk_titles if r not in selected_risks]
 
 # 🔄  Store & show sticky pill
 #st.session_state.experience_level  = experience_level
