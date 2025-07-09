@@ -388,20 +388,6 @@ ticker_df["Label"] = (
     ticker_df["Amount"].round(0).astype(int).astype(str) + ")"
 )
 
-# 9. Optional pie chart toggle
-with st.sidebar:
-    if st.checkbox("📊 Show Portfolio Pie Chart", value=False, key="sidebar_portfolio_pie"):
-        st.markdown("#### 🥧 Portfolio Allocation")
-        st.plotly_chart(
-            px.pie(
-                ticker_df,
-                names="Label",
-                values="Amount",
-                hole=0.3
-            ).update_traces(textinfo="label+percent"),
-            use_container_width=True
-        )
-
 # 10. Save final list
 portfolio = st.session_state.portfolio
 
@@ -532,9 +518,9 @@ st.markdown("### 📝  Strategy Designer")
 #capital      = st.number_input("Capital (USD)", 1000, 1_000_000, 10_000, 1000)
 #horizon      = st.slider("Time horizon (months)", 1, 24, 6)
 
-with st.expander("⚖️  Risk controls"):
-    beta_rng  = st.slider("Beta match band", 0.5, 1.5, (0.8, 1.2), 0.05)
-    stop_loss = st.slider("Stop-loss for shorts (%)", 1, 20, 10)
+with st.sidebar.expander("⚖️ Risk controls", expanded=True):
+    beta_rng  = st.slider("Beta match band", 0.5, 1.5, (0.8, 1.2), 0.05, key="beta_band")
+    stop_loss = st.slider("Stop-loss for shorts (%)", 1, 20, 10, key="stop_loss_slider")
 
 # ─────────────────────── Strategy generation & rendering ───────────────────────
 if st.button("Suggest strategy", type="primary"):
@@ -759,22 +745,6 @@ if st.session_state.avoid_dup_hedges:
 
     # 📊 Post-hedge allocation (optional chart)
     st.dataframe(combined_df.drop(columns=["Rationale"]), use_container_width=True)
-
-    with st.sidebar:
-        if st.checkbox("📊 Show Post-Hedge Pie Chart", value=False, key="sidebar_post_hedge_pie"):
-            st.markdown("#### 🧮 Post-Hedge Allocation")
-            pie_df = combined_df.copy()
-            pie_df["Label"] = pie_df["Ticker"] + " (" + pie_df["Position"] + ")"
-            pie_df["Amount"] = pie_df["Amount ($)"]
-            st.plotly_chart(
-                px.pie(
-                    pie_df,
-                    names="Label",
-                    values="Amount",
-                    hole=0.3
-                ).update_traces(textinfo="label+percent"),
-                use_container_width=True
-            )
 
     # ✅ Markdown rationale display (not the table)
     st.markdown("### 📌 Hedge Strategy Rationale")
