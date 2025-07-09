@@ -610,25 +610,25 @@ if st.session_state.avoid_dup_hedges:
         "- ✅ Prefer diversifiers (sector ETFs, index futures, inverse ETFs, FX, commodities).\n"
     )
 
-    # ✅ Build final prompt
+        # ✅ Build final prompt  (copy–paste over your existing block)
     prompt = textwrap.dedent(f"""
         Act as a **tactical hedging strategist**.  
         Goal: *preserve capital* while keeping portfolio beta inside **{beta_rng[0]:.2f}–{beta_rng[1]:.2f}**.
 
         {avoid_note}
-         **Allowed hedge types**: {', '.join(st.session_state.allowed_instruments)}
-        Only suggest instruments from the list above. Do NOT suggest anything not listed.
+        **Allowed hedge types**: {', '.join(st.session_state.allowed_instruments)}
+        Only suggest instruments from the list above. Do **NOT** suggest anything not listed.
 
         ### Step-by-Step Reasoning  
         1. **Identify Hedging Targets**  
-        • Flag holdings with:  
+        • Flag holdings with  
             – Stop-loss ≥ 5 % above market price, or  
             – High sensitivity to headline risks: {risk_string}.  
         • Ignore: {ignored}  
 
         2. **Select Instruments**  
-        • Primary: **Put options** (strike ≤ stop-loss – 2 %; expiry {horizon} ± 0.5 mo).  
-        • Secondary: **Shorts / inverse ETFs / futures** only if stop-loss buffer ≥ {stop_loss} %.  
+        • Primary – Put options (strike ≤ stop-loss – 2 %; expiry {horizon} ± 0.5 mo).  
+        • Secondary – Shorts / inverse ETFs / futures only if stop-loss buffer ≥ {stop_loss} %.  
 
         3. **Size Positions**  
         • Total hedge budget ≤ 15 % of capital (${total_capital:,.0f}).  
@@ -648,18 +648,16 @@ if st.session_state.avoid_dup_hedges:
         • Portfolio stop-loss buffer (shorts): {stop_loss}%  
 
         ### Investor profile  
-        f"Experience: {st.session_state.experience_level} • Detail: {st.session_state.explanation_pref} → {experience_note}"
+        Experience: {st.session_state.experience_level} • Detail: {st.session_state.explanation_pref} → {experience_note}
 
         ---
         ### OUTPUT SPEC *(Markdown only — no tables, no code fences, no HTML)*  
 
         **Hedge list** — one numbered bullet per hedge, *exactly* like this template  
         ```
-        1. **AAPL** — Put Option. Buy 3 × Aug $175 puts; buffers earnings-gap risk (≤ {rationale_rule}) [1]  
-        2. **MSFT** — Short via PSQ ETF. Offsets SaaS demand softness … [2]  
+        1. **AAPL** — Put Option. Buy 3 × Aug $175 puts … (≤ {rationale_rule}) [1]  
+        2. **MSFT** — Short via PSQ ETF … [2]  
         ```
-        (Your wording and tickers will differ, but keep the same bullet structure.)
-
         **Rules**  
         • Each bullet must end with a reference marker like `[1]`.  
         • {rationale_rule}  
@@ -673,13 +671,12 @@ if st.session_state.avoid_dup_hedges:
         [2] https://another.source/example  
         ```
 
-        **After the references**, add:  
+        **After the references**, add  
         1. `### Summary` — ≤ 300 characters.  
         2. `### Residual Risks` — numbered list, each risk ≤ 25 words **and** ending with its own URL.
 
         ❗ Final answer: plain Markdown only.
     """).strip()
-
 
     # 2.  Call OpenAI -----------------------------------------------------------
     with st.spinner("Calling ChatGPT…"):
