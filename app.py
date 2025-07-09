@@ -16,7 +16,6 @@ from stock_utils import get_stock_summary # your own helper
 st.set_page_config(page_title="Hedge Strategy Chatbot", layout="centered")
 
 with st.sidebar.expander("📌 Investor Profile", expanded=False):
-    suggest_clicked = st.sidebar.button("🚀 Suggest strategy", type="primary", use_container_width=True)
     st.radio("Experience", ["Beginner", "Intermediate", "Expert"], key="experience_level")
     st.radio("Detail level", ["Just the strategy", "Explain the reasoning", "Both"], key="explanation_pref")
     st.slider("⏳ Time horizon (months)", 1, 24, 6, key="time_horizon")
@@ -67,6 +66,7 @@ with st.sidebar.expander("⚙️ Strategy Settings", expanded=False):
             st.experimental_rerun()
 
 with st.sidebar.expander("🧹 Session Tools", expanded=False):
+    suggest_clicked = st.sidebar.button("🚀 Suggest strategy", type="primary", use_container_width=True)
     if st.button("🗑️ Clear Portfolio"):
         st.session_state.portfolio_alloc = {}
     if st.button("🧽 Clear Chat History"):
