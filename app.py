@@ -648,7 +648,7 @@ if st.session_state.avoid_dup_hedges:
         • Portfolio stop-loss buffer (shorts): {stop_loss}%  
 
         ### Investor profile  
-        Experience: {st.session_state.experience_level} • Detail: {exp_pref} → {experience_note}
+        f"Experience: {st.session_state.experience_level} • Detail: {st.session_state.explanation_pref} → {experience_note}"
 
         ---
         ### OUTPUT SPEC *(Markdown only — no tables, no code fences, no HTML)*  
