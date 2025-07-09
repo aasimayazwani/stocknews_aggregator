@@ -18,13 +18,13 @@ st.set_page_config(page_title="Hedge Strategy Chatbot", layout="centered")
 with st.sidebar.expander("📌 Investor Profile", expanded=False):
     st.radio("Experience", ["Beginner", "Intermediate", "Expert"], key="experience_level")
     st.radio("Detail level", ["Just the strategy", "Explain the reasoning", "Both"], key="explanation_pref")
+    st.slider("⏳ Time horizon (months)", 1, 24, 6, key="time_horizon")
 
 with st.sidebar.expander("🧮 Investment Settings", expanded=True):
     st.selectbox("Focus stock", options=["AAPL", "MSFT", "TSLA"], key="focus_stock")
 with st.sidebar.expander("⚙️ Strategy Settings", expanded=False):
 
-    # 📆 Horizon & Risk Control
-    st.slider("⏳ Time horizon (months)", 1, 24, 6, key="time_horizon")
+    # 📆 Horizon & Risk Contro
     st.checkbox("🚫 Avoid suggesting same stocks in hedge", value=True, key="avoid_overlap")
 
     st.slider("🎯 Beta match band", 0.5, 2.0, (1.15, 1.50), step=0.01, key="beta_band")
