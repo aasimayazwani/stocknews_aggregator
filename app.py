@@ -551,8 +551,8 @@ with st.sidebar.expander("⚖️ Risk controls", expanded=True):
                                   1, 10, 5, 1, key="single_hedge_pct")
 
 # Make them available everywhere
-st.session_state.hedge_budget_pct = hedge_budget_pct
-st.session_state.single_hedge_pct = single_hedge_pct
+#st.session_state.hedge_budget_pct = hedge_budget_pct
+#st.session_state.single_hedge_pct = single_hedge_pct
 
 st.sidebar.markdown(
     f"""
