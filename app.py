@@ -330,7 +330,7 @@ experience_to_default = {
     "Expert": ["Put Options", "Collar Strategy", "Inverse ETFs", "Short Selling", "Volatility Hedges", "Commodities", "FX Hedges"]
 }
 
-
+avoid_duplicate_hedges = st.session_state.get("avoid_overlap", True)
 # Store in session state
 st.session_state.avoid_dup_hedges = avoid_duplicate_hedges
 
