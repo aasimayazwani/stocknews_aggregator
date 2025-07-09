@@ -544,41 +544,29 @@ with st.sidebar.expander("⚖️ Risk controls", expanded=True):
     beta_rng  = st.slider("Beta match band", 0.5, 1.5, (0.8, 1.2), 0.05, key="beta_band")
     stop_loss = st.slider("Stop-loss for shorts (%)", 1, 20, 10, key="stop_loss_slider")
 
-    # NEW — hedge–budget governance
-    hedge_budget_pct  = st.slider("Max hedge budget (% of capital)",
-                                  5, 30, 15, 1, key="hedge_budget_pct")
-    single_hedge_pct  = st.slider("Max per single hedge (% of capital)",
-                                  1, 10, 5, 1, key="single_hedge_pct")
+# Sidebar – Hedge budget
+with st.sidebar.expander("💵 Hedge budget", expanded=True):
+    hedge_budget_pct = st.slider(
+        "Total hedge budget (%% of capital)",
+        5, 25, 15, 1, key="hedge_budget_pct"
+    )
+    single_hedge_pct = st.slider(
+        "Max per single hedge (%% of capital)",
+        1, 10, 5, 1, key="single_hedge_pct"
+    )
 
-# Make them available everywhere
-#st.session_state.hedge_budget_pct = hedge_budget_pct
-#st.session_state.single_hedge_pct = single_hedge_pct
-
-st.sidebar.markdown(
-    f"""
-    <div style='margin-top:6px;padding:4px 8px;border-radius:12px;
-                background:#334155;color:#f8fafc;display:inline-block;font-size:13px;'>
-        {st.session_state.experience_level} • {st.session_state.explanation_pref} •
-        Hedge cap {hedge_budget_pct}% / {single_hedge_pct}% per-hedge
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-# ─────────────────────── Strategy generation & rendering ───────────────────────
+# Strategy generation & rendering
 if st.button("Suggest strategy", type="primary"):
-    # ─── 1. Collect context values ───────────────────────────
-    ignored        = "; ".join(st.session_state.risk_ignore) or "None"
-    total_capital  = sum(st.session_state.portfolio_alloc.values())
-    risk_string    = ", ".join(risk_titles) or "None"
-    alloc_str      = "; ".join(f"{k}: ${v:,.0f}" 
-                               for k,v in st.session_state.portfolio_alloc.items()) or "None"
+    # 1. Collect context values
+    ignored = "; ".join(st.session_state.risk_ignore) or "None"
+    total_capital = sum(st.session_state.portfolio_alloc.values())
+    risk_string = ", ".join(risk_titles) or "None"
+    alloc_str = "; ".join(f"{k}: ${v:,.0f}" for k, v in st.session_state.portfolio_alloc.items()) or "None"
 
-    # ─── 2.  🔹 NEW: dynamic tone-/length guidance  ───────────
-    st.session_state.experience_level  = experience_level
-    st.session_state.explanation_pref  = explanation_pref
-
-    exp_pref = st.session_state.explanation_pref  # ← Add this line
+    # 2. Dynamic tone-/length guidance
+    st.session_state.experience_level = experience_level
+    st.session_state.explanation_pref = explanation_pref
+    exp_pref = st.session_state.explanation_pref
 
     experience_note = {
         "Beginner":     "Use plain language and define jargon the first time you use it.",
@@ -590,50 +578,28 @@ if st.button("Suggest strategy", type="primary"):
         rationale_rule = "Each *Rationale* must be **≤ 25 words (one sentence)**."
     elif exp_pref == "Explain the reasoning":
         rationale_rule = ("Each *Rationale* must be **2 sentences totalling ≈ 30-50 words** "
-                        "(logic + risk linkage).")
+                          "(logic + risk linkage).")
     else:  # "Both"
         rationale_rule = ("Each *Rationale* must be **3 sentences totalling ≈ 60-90 words** – "
-                        "1️⃣ logic, 2️⃣ quantitative context, 3️⃣ trade-offs.")
+                          "1️⃣ logic, 2️⃣ quantitative context, 3️⃣ trade-offs.")
 
     stop_loss_str = "; ".join(
         f"{ticker}: ${float(sl):.2f}" for ticker, sl in st.session_state.stop_loss_map.items() if pd.notnull(sl)
     ) or "None"
 
-    # --------------------------------------------
-# 🔧  BUILD FINAL PROMPT STRING
-# --------------------------------------------
-# 1️⃣  Optional note to stop the model from re-using portfolio tickers
-risk_string = ", ".join(risk_titles) or "None"
-ignored = "; ".join(st.session_state.risk_ignore) or "None"
-stop_loss_str = "; ".join(
-    f"{ticker}: ${float(sl):.2f}" for ticker, sl in st.session_state.stop_loss_map.items() if pd.notnull(sl)
-) or "None"
-avoid_note = ""
-# ─── Collect all required vars BEFORE prompt ─────────────────────────────
-risk_string = ", ".join(risk_titles) or "None"
-ignored = "; ".join(st.session_state.risk_ignore) or "None"
-stop_loss_str = "; ".join(
-    f"{ticker}: ${float(sl):.2f}" for ticker, sl in st.session_state.stop_loss_map.items() if pd.notnull(sl)
-) or "None"
-total_capital = sum(st.session_state.portfolio_alloc.values())
-alloc_str = "; ".join(f"{k}: ${v:,.0f}" for k, v in st.session_state.portfolio_alloc.items()) or "None"
-
-
-# ❌ Diversification toggle
-if st.session_state.avoid_dup_hedges:
-    avoid_note = (
-        "- ❌ **Do NOT suggest hedge instruments already in the user’s portfolio** "
-        f"({', '.join(st.session_state.portfolio)}).\n"
-        "- ✅ Prefer diversifiers (sector ETFs, index futures, inverse ETFs, FX, commodities).\n"
-    )
-    total_capital = sum(st.session_state.portfolio_alloc.values())
+    hedge_budget_pct = st.session_state.hedge_budget_pct
+    single_hedge_pct = st.session_state.single_hedge_pct
     max_hedge_notional = total_capital * hedge_budget_pct / 100
 
+    avoid_note = ""
+    if st.session_state.avoid_dup_hedges:
+        avoid_note = (
+            "- ❌ **Do NOT suggest hedge instruments already in the user’s portfolio** "
+            f"({', '.join(st.session_state.portfolio)}).\n"
+            "- ✅ Prefer diversifiers (sector ETFs, index futures, inverse ETFs, FX, commodities).\n"
+        )
 
-        # ✅ Build final prompt  (copy–paste over your existing block)
-    # -------------------------------- BUILD FINAL PROMPT --------------------------------
-    max_hedge_notional = total_capital * hedge_budget_pct / 100  # <- already computed above
-
+    # Build final prompt
     prompt = textwrap.dedent(f"""
         Act as a **tactical hedging strategist**.  
         Goal: *preserve capital* while keeping portfolio beta inside **{beta_rng[0]:.2f}–{beta_rng[1]:.2f}**.
@@ -713,8 +679,6 @@ if st.session_state.avoid_dup_hedges:
 
         ❗ Final answer: plain Markdown only.
     """).strip()
-
-
 
     # 2.  Call OpenAI -----------------------------------------------------------
     with st.spinner("Calling ChatGPT…"):
