@@ -612,71 +612,84 @@ if st.session_state.avoid_dup_hedges:
 
         # ✅ Build final prompt  (copy–paste over your existing block)
     prompt = textwrap.dedent(f"""
-        Act as a **tactical hedging strategist**.  
-        Goal: *preserve capital* while keeping portfolio beta inside **{beta_rng[0]:.2f}–{beta_rng[1]:.2f}**.
+    Act as a **tactical hedging strategist**.  
+    Goal: *preserve capital* while keeping portfolio beta inside **{beta_rng[0]:.2f}–{beta_rng[1]:.2f}**.
 
-        {avoid_note}
-        **Allowed hedge types**: {', '.join(st.session_state.allowed_instruments)}
-        Only suggest instruments from the list above. Do **NOT** suggest anything not listed.
+    {avoid_note}
+    **Allowed hedge types**: {', '.join(st.session_state.allowed_instruments)}
+    Only suggest instruments from the list above. Do **NOT** suggest anything not listed.
 
-        ### Step-by-Step Reasoning
-        1. **Identify Hedging Targets**
-        • Flag holdings with  
-            – Stop-loss ≥ 5 % above market price, or  
-            – High sensitivity to headline risks: {risk_string}.  
-        • Ignore: {ignored}
+    ### Step-by-Step Reasoning
+    1. **Identify Hedging Targets**
+       • Flag holdings with  
+         – Stop-loss ≥ 5 % above market price, **or**  
+         – High sensitivity to headline risks: {risk_string}.  
+       • Ignore: {ignored}
 
-        2. **Select Instruments**
-        • Primary – Put options (strike ≤ stop-loss – 2 %; expiry {horizon} ± 0.5 mo).  
-        • Secondary – Shorts / inverse ETFs / futures only if stop-loss buffer ≥ {stop_loss} %.
+    2. **Select Instruments**
+       • Primary – Put options (strike ≤ stop-loss – 2 %; expiry {horizon} ± 0.5 mo).  
+       • Secondary – Shorts / inverse ETFs / futures **only** if stop-loss buffer ≥ {stop_loss} %.
 
-        3. **Size Positions**
-        • Total hedge budget ≤ 15 % of capital (${total_capital:,.0f}).  
-        • Any single hedge ≤ 5 % of capital.  
-        • Rebalance to maintain target beta.
+    3. **Size Positions**
+       • **Total hedge budget ≤ 15 %** of capital (${total_capital:,.0f}).  
+       • **Any single hedge ≤ 5 %** of capital.  
+       • Rebalance to maintain target beta.
 
-        4. **Cost Optimisation**
-        • Aim for option premium ≤ 3 % of notional per hedge.
+    4. **Cost Optimisation**
+       • Aim for option premium ≤ 3 % of notional per hedge.
 
-        ---
-        **Context snapshot**
-        • Basket: {', '.join(basket)}
-        • Allocation: {alloc_str}
-        • User stop-losses: {stop_loss_str}
-        • Horizon: {horizon} mo
-        • Total capital: ${total_capital:,.0f}
-        • Portfolio stop-loss buffer (shorts): {stop_loss} %
+    ---
+    **Context snapshot**
+    • Basket: {', '.join(basket)}  
+    • Allocation: {alloc_str}  
+    • User stop-losses: {stop_loss_str}  
+    • Horizon: {horizon} mo  
+    • Total capital: ${total_capital:,.0f}  
+    • Portfolio stop-loss buffer (shorts): {stop_loss} %
 
-        ### Investor profile
-        Experience: {st.session_state.experience_level} • Detail: {st.session_state.explanation_pref} → {experience_note}
+    ### Investor profile
+    Experience: {st.session_state.experience_level} • Detail: {st.session_state.explanation_pref} → {experience_note}
 
-        ---
-        ### OUTPUT SPEC *(Markdown only — no tables, no code fences, no HTML)*
+    ---
+    ### OUTPUT SPEC *(Markdown only — no tables, no code fences, no HTML)*
 
-        **Hedge list** — one numbered bullet per hedge, *exactly* like this template  
-        ```
-        1. **AAPL** — Put Option. Buy 3 × Aug $175 puts … (≤ {rationale_rule}) [1]
-        2. **MSFT** — Short via PSQ ETF … [2]
-        ```
-        **Rules**  
-        • Each bullet must end with a reference marker like `[1]`.  
-        • {rationale_rule}  
-        • If an option, include strike / expiry / premium / # contracts.  
-        • Do **not** suggest tickers already in the user’s portfolio if diversification is required.  
-        • Limit to **5 hedges maximum**.
+    **Hedge list** — one numbered bullet per hedge, *exactly* like this template  
+    ```
+    1. **AAPL** — Put Option. Buy 3 × Aug $175 puts … (≤ {rationale_rule}) [1]  
+    2. **MSFT** — Short via PSQ ETF … [2]  
+    ```
 
-        **Reference list** (immediately after the bullets, one per line)  
-        ```
-        [1] https://valid.source/for/aapl
-        [2] https://another.source/example
-        ```
+    **Sizing table** — immediately *after* the bullets  
+    ```
+    | Hedge | Qty / Contracts | $ Notional | % of Capital |
+    |-------|-----------------|-----------:|-------------:|
+    | AAPL Aug 175 Puts | 3 contracts | $3 000 | 3 % |
+    | PSQ ETF | 500 sh | $5 000 | 5 % |
+    | … | … | … | … |
+    | **Total** |   | **≤ $15 000** | **≤ 15 %** |
+    ```
+    • Ensure each row ≤ 5 % and total row ≤ 15 %.  
+    • If you recommend futures, show contract size equal to the notional you quote.
 
-        **After the references**, add  
-        1. `### Summary` — ≤ 300 characters.  
-        2. `### Residual Risks` — numbered list, each risk ≤ 25 words **and** ending with its own URL.
+    **Rules**  
+    • Each hedge bullet ends with a reference marker like `[1]`.  
+    • {rationale_rule}  
+    • If an option, include strike / expiry / premium / # contracts in the bullet.  
+    • Do **not** suggest tickers already in the user’s portfolio if diversification is required.  
+    • Limit to **5 hedges maximum**.
 
-        ❗ Final answer: plain Markdown only.
-    """).strip()
+    **Reference list** (immediately after sizing table, one per line)  
+    ```
+    [1] https://valid.source/for/aapl  
+    [2] https://another.source/example  
+    ```
+
+    **After the references**, add  
+    1. `### Summary` — ≤ 300 characters.  
+    2. `### Residual Risks` — numbered list, each risk ≤ 25 words **and** ending with its own URL.
+
+    ❗ Final answer: plain Markdown only.
+""").strip()
 
 
     # 2.  Call OpenAI -----------------------------------------------------------
