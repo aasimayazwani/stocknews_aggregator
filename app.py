@@ -66,6 +66,17 @@ with st.sidebar.expander("⚙️ Strategy Settings", expanded=False):
             st.experimental_rerun()
 
 with st.sidebar.expander("🧹 Session Tools", expanded=False):
+    with st.sidebar.expander("🧠 Previous Strategies", expanded=True):
+        history = st.session_state.get("strategy_history", [])
+
+        if history:
+            for i, strategy_text in enumerate(history):
+                # Create a unique label for button
+                label = f"Strategy #{i+1}"
+                if st.button(label, key=f"strategy_{i}"):
+                    st.session_state.active_strategy = i
+        else:
+            st.info("No strategies yet.")
     suggest_clicked = st.sidebar.button("🚀 Suggest strategy", type="primary", use_container_width=True)
     if st.button("🗑️ Clear Portfolio"):
         st.session_state.portfolio_alloc = {}
@@ -73,6 +84,7 @@ with st.sidebar.expander("🧹 Session Tools", expanded=False):
         st.session_state.chat_history = []
     if st.button("🗑️ Clear Strategy History"):
         st.session_state.strategy_history = []
+    
 
 # 🔧 Extract sidebar values into variables
 experience_level   = st.session_state.get("experience_level", "Expert")
@@ -394,6 +406,20 @@ st.session_state.avoid_dup_hedges = avoid_duplicate_hedges
 # 🎯 basket computation moved below
 others  = [t for t in st.session_state.portfolio if t != primary]
 basket  = [primary] + others
+
+
+if "active_strategy" in st.session_state:
+    idx = st.session_state.active_strategy
+    strategy = st.session_state.strategy_history[idx]
+
+    # Render the selected strategy block
+    with st.container():
+        st.markdown("### 📌 Previously Suggested Strategy")
+        st.markdown(strategy)
+
+        # Dismiss button
+        if st.button("❌ Close", key="close_active_strategy"):
+            del st.session_state.active_strategy
 
 # ───────────────────────────── PORTFOLIO UI ──────────────────────────
 # ⬇️ NEW ticker search & autocomplete with live API results
