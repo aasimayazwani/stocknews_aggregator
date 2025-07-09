@@ -114,13 +114,17 @@ st.markdown("""
 <style>
 div[data-baseweb="select"] > div {
     background-color: #1f2937 !important;
-    border-radius: 10px !important;
-    padding: 4px;
-    color: #f8fafc !important;
+    border-radius: 12px !important;
+    padding: 4px 12px !important;
+    color: #f1f5f9 !important;
+    font-size: 15px !important;
+    min-height: 40px !important;
+    line-height: 1.4 !important;
+    display: flex;
+    align-items: center;
 }
 </style>
 """, unsafe_allow_html=True)
-
 st.markdown("""
     <style>
       .stMultiSelect > div {
