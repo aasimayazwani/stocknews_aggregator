@@ -305,6 +305,24 @@ with st.sidebar.expander("🕒 Investment settings", expanded=True):
     horizon = st.slider("⏳ Time horizon (months)", 1, 24, 6, key="horizon_slider")
     avoid_duplicate_hedges = st.checkbox("❌ Avoid suggesting same stocks in hedge", value=True)
 
+# 🛡️ Hedge instrument defaults by experience
+experience_to_default = {
+    "Beginner": ["Inverse ETFs", "Commodities"],
+    "Intermediate": ["Put Options", "Inverse ETFs", "Commodities"],
+    "Expert": ["Put Options", "Collar Strategy", "Inverse ETFs", "Short Selling", "Volatility Hedges", "Commodities", "FX Hedges"]
+}
+
+# Sidebar: Hedge instruments based on experience
+default_instruments = experience_to_default.get(st.session_state.experience_level, [])
+with st.sidebar.expander("🛡️ Allowed Hedge Instruments", expanded=True):
+    allowed_instruments = st.multiselect(
+        "Choose hedge instruments to include",
+        ["Put Options", "Collar Strategy", "Inverse ETFs", "Short Selling", "Volatility Hedges", "Commodities", "FX Hedges"],
+        default=default_instruments,
+        help="Uncheck any hedge types you do not want the LLM to suggest."
+    )
+st.session_state.allowed_instruments = allowed_instruments
+
 # Store in session state
 st.session_state.avoid_dup_hedges = avoid_duplicate_hedges
 
@@ -599,6 +617,8 @@ if st.session_state.avoid_dup_hedges:
         Goal: *preserve capital* while keeping portfolio beta inside **{beta_rng[0]:.2f}–{beta_rng[1]:.2f}**.
 
         {avoid_note}
+         **Allowed hedge types**: {', '.join(st.session_state.allowed_instruments)}
+        Only suggest instruments from the list above. Do NOT suggest anything not listed.
 
         ### Step-by-Step Reasoning  
         1. **Identify Hedging Targets**  
