@@ -549,7 +549,13 @@ if "strategy_history" not in st.session_state:
     st.session_state.strategy_history = []
 
 # ─────────────────────────── STRATEGY DESIGNER ───────────────────────
-st.markdown("### 📝  Strategy Designer")
+col1, col2 = st.columns([5, 1])  # Title gets more space
+
+with col1:
+    st.markdown("### 📝  Strategy Designer")
+
+with col2:
+    suggest_clicked = st.button("Suggest strategy", type="primary", use_container_width=True)
 #sector_guess = yf.Ticker(primary).info.get("sector", "")
 #sector_in    = st.text_input("Sector", sector_guess)
 #goal         = st.selectbox("Positioning goal", ["Long", "Short", "Hedged", "Neutral"])
