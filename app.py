@@ -1,6 +1,5 @@
 # app.py – Market-Movement Chatbot  (portfolio-aware + risk-scan edition)
 from __future__ import annotations
-
 import re, textwrap, requests
 from typing import List
 import requests
@@ -527,8 +526,8 @@ st.session_state.risk_ignore = [r for r in risk_titles if r not in selected_risk
 
 
 # 🔄  Store & show sticky pill
-st.session_state.experience_level  = experience_level
-st.session_state.explanation_pref  = explanation_pref
+#st.session_state.experience_level  = experience_level
+#st.session_state.explanation_pref  = explanation_pref
 
 experience_to_default = {
     "Beginner": ["Inverse ETFs", "Commodities"],
