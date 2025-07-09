@@ -16,8 +16,8 @@ from stock_utils import get_stock_summary # your own helper
 st.set_page_config(page_title="Hedge Strategy Chatbot", layout="centered")
 
 with st.sidebar.expander("📌 Investor Profile", expanded=False):
-    st.radio("Experience", ["Beginner", "Intermediate", "Expert"], key="experience_level")
-    st.radio("Detail level", ["Just the strategy", "Explain the reasoning", "Both"], key="explanation_pref")
+    st.selectbox("Experience", ["Beginner", "Intermediate", "Expert"], key="experience_level")
+    st.selectbox("Detail level", ["Just the strategy", "Explain the reasoning", "Both"], key="explanation_pref")
     st.slider("⏳ Time horizon (months)", 1, 24, 6, key="time_horizon")
 
 with st.sidebar.expander("🧮 Investment Settings", expanded=True):
@@ -108,6 +108,18 @@ single_hedge_pct   = st.session_state.get("max_hedge", 5)
 horizon            = st.session_state.get("time_horizon", 6)
 primary            = focus_stock  # Rename for clarity
 model              = DEFAULT_MODEL  # You already imported this
+
+
+st.markdown("""
+<style>
+div[data-baseweb="select"] > div {
+    background-color: #1f2937 !important;
+    border-radius: 10px !important;
+    padding: 4px;
+    color: #f8fafc !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
 st.markdown("""
     <style>
