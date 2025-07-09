@@ -15,7 +15,11 @@ from stock_utils import get_stock_summary # your own helper
 # ────────────────────────────────── THEME ─────────────────────────────────
 st.set_page_config(page_title="Hedge Strategy Chatbot", layout="centered")
 
+
+
 with st.sidebar.expander("📌 Investor Profile", expanded=False):
+    st.sidebar.markdown("---")  # Optional divider
+    suggest_clicked = st.sidebar.button("🚀 Suggest strategy", type="primary", use_container_width=True)
     st.radio("Experience", ["Beginner", "Intermediate", "Expert"], key="experience_level")
     st.radio("Detail level", ["Just the strategy", "Explain the reasoning", "Both"], key="explanation_pref")
     st.slider("⏳ Time horizon (months)", 1, 24, 6, key="time_horizon")
@@ -549,20 +553,6 @@ if "strategy_history" not in st.session_state:
     st.session_state.strategy_history = []
 
 # ─────────────────────────── STRATEGY DESIGNER ───────────────────────
-col1, col2 = st.columns([7, 1], gap="small")
-
-with col1:
-    st.markdown(
-        "<h3 style='margin: 0; padding-top: 0.35rem;'>📝 Strategy Designer</h3>",
-        unsafe_allow_html=True
-    )
-
-with col2:
-    st.markdown(
-        "<div style='margin-top: 0.75rem;'>", unsafe_allow_html=True
-    )
-    suggest_clicked = st.button("Suggest strategy", type="primary", use_container_width=True)
-    st.markdown("</div>", unsafe_allow_html=True)
 
     #st.markdown("</div>", unsafe_allow_html=True)
 #sector_guess = yf.Ticker(primary).info.get("sector", "")
