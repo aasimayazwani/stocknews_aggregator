@@ -559,13 +559,13 @@ if st.button("Suggest strategy", type="primary"):
                                for k,v in st.session_state.portfolio_alloc.items()) or "None"
 
     # ─── 2.  🔹 NEW: dynamic tone-/length guidance  ───────────
+    exp_pref = st.session_state.explanation_pref
     experience_note = {
         "Beginner":     "Use plain language and define jargon the first time you use it.",
         "Intermediate": "Assume working knowledge of finance; keep explanations concise.",
         "Expert":       "Write in professional sell-side style; no hand-holding.",
     }[st.session_state.experience_level]
 
-    exp_pref = st.session_state.explanation_pref
     if exp_pref == "Just the strategy":
         rationale_rule = "Each *Rationale* must be **≤ 25 words (one sentence)**."
     elif exp_pref == "Explain the reasoning":
