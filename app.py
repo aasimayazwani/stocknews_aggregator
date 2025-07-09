@@ -45,6 +45,21 @@ with st.sidebar.expander("🧹 Session Tools", expanded=False):
     if st.button("🧽 Clear Chat History"):
         st.session_state.chat_history = []
 
+# 🔧 Extract sidebar values into variables
+experience_level   = st.session_state.get("experience_level", "Expert")
+explanation_pref   = st.session_state.get("explanation_pref", "Both")
+focus_stock        = st.session_state.get("focus_stock", "AAPL")
+avoid_overlap      = st.session_state.get("avoid_overlap", True)
+allowed_instruments = st.session_state.get("allowed_instruments", ["Put Options", "Collar Strategy"])
+beta_rng           = st.session_state.get("beta_band", (1.15, 1.50))
+stop_loss          = st.session_state.get("stop_loss", 10)
+hedge_budget_pct   = st.session_state.get("total_budget", 10)
+single_hedge_pct   = st.session_state.get("max_hedge", 5)
+horizon            = st.session_state.get("time_horizon", 6)
+primary            = focus_stock  # Rename for clarity
+model              = DEFAULT_MODEL  # You already imported this
+
+
 st.markdown(
     """
     <style>
@@ -553,8 +568,8 @@ if st.button("Suggest strategy", type="primary"):
     alloc_str = "; ".join(f"{k}: ${v:,.0f}" for k, v in st.session_state.portfolio_alloc.items()) or "None"
 
     # 2. Dynamic tone-/length guidance
-    st.session_state.experience_level = experience_level
-    st.session_state.explanation_pref = explanation_pref
+    #st.session_state.experience_level = experience_level
+    #st.session_state.explanation_pref = explanation_pref
     exp_pref = st.session_state.explanation_pref
 
     experience_note = {
