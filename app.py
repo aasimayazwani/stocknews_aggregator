@@ -590,8 +590,8 @@ if st.button("Suggest strategy", type="primary"):
         f"{ticker}: ${float(sl):.2f}" for ticker, sl in st.session_state.stop_loss_map.items() if pd.notnull(sl)
     ) or "None"
 
-    hedge_budget_pct = st.session_state.hedge_budget_pct
-    single_hedge_pct = st.session_state.single_hedge_pct
+    hedge_budget_pct   = st.session_state.get("total_budget", 10)     # ← from sidebar slider
+    single_hedge_pct   = st.session_state.get("max_hedge", 5)         # ← from sidebar slider
     max_hedge_notional = total_capital * hedge_budget_pct / 100
 
     avoid_note = ""
