@@ -207,7 +207,7 @@ st.markdown(
 )
 
 
-st.title("🎯  Equity Strategy Assistant")
+st.title("Equity Strategy Assistant")
 
 # ─────────────────────────────── STATE ────────────────────────────────
 if "history"     not in st.session_state: st.session_state.history     = []
@@ -398,7 +398,7 @@ basket  = [primary] + others
 # ⬇️ NEW ticker search & autocomplete with live API results
 
 # ─────────────────── 💰 POSITION-SIZE EDITOR ────────────────────
-st.markdown("### 💰 Position sizes Editable")
+st.markdown("### Position sizes Editable")
 
 # 1. Boot-strap a persistent table in session-state
 if "alloc_df" not in st.session_state:
