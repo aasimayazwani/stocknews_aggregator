@@ -69,14 +69,27 @@ with st.sidebar.expander("🧹 Session Tools", expanded=False):
     with st.sidebar.expander("🧠 Previous Strategies", expanded=True):
         history = st.session_state.get("strategy_history", [])
 
-        if history:
-            for i, strategy_text in enumerate(history):
-                # Create a unique label for button
-                label = f"Strategy #{i+1}"
-                if st.button(label, key=f"strategy_{i}"):
-                    st.session_state.active_strategy = i
+        if not history:
+            st.info("No previous strategies yet.")
         else:
-            st.info("No strategies yet.")
+            for idx, run in reversed(list(enumerate(history))):
+                with st.expander(f"Run {idx+1} — {run['timestamp']} | Horizon: {run['horizon']} mo"):
+                    st.markdown(
+                        f"**Capital**: ${run['capital']:,.0f}  \n"
+                        f"**Beta Band**: {run['beta_band'][0]}–{run['beta_band'][1]}"
+                    )
+
+                    # Display strategy sizing table
+                    st.dataframe(run["strategy_df"], use_container_width=True)
+
+                    # Display rationale (markdown-formatted strategy)
+                    st.markdown("**Strategy Rationale**")
+                    st.markdown(run["rationale_md"])
+
+            if st.button("🗑️ Clear Strategy History", use_container_width=True):
+                st.session_state.strategy_history = []
+                st.rerun()
+
     suggest_clicked = st.sidebar.button("🚀 Suggest strategy", type="primary", use_container_width=True)
     if st.button("🗑️ Clear Portfolio"):
         st.session_state.portfolio_alloc = {}
@@ -770,21 +783,6 @@ if suggest_clicked:
     # ✅ Markdown rationale display (not the table)
     st.markdown("### 📌 Hedge Strategy Rationale")
     st.markdown(plan_md)
-
-# ─────────────────────────────── STRATEGY HISTORY ───────────────────────────────
-st.markdown("### 🕘 Previous Strategies")
-
-if not st.session_state.strategy_history:
-    st.info("No previous strategies yet.")
-else:
-    for idx, run in reversed(list(enumerate(st.session_state.strategy_history))):
-        with st.expander(f"Run {idx+1} — {run['timestamp']} | Horizon: {run['horizon']} mo"):
-            st.markdown(
-                f"**Capital**: ${run['capital']:,.0f} • "
-                f"**Beta Band**: {run['beta_band'][0]}–{run['beta_band'][1]}"
-            )
-            st.dataframe(run["strategy_df"], use_container_width=True)
-            st.markdown(run["rationale_md"])
 
 # ───────────────────────────── QUICK CHAT ────────────────────────────
 st.divider()
