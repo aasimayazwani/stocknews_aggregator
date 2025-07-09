@@ -474,7 +474,6 @@ ticker_df["Label"] = (
 # 10. Save final list
 portfolio = st.session_state.portfolio
 
-# ────────────────────── SIDEBAR: Key Headline Risks ──────────────────────
 with st.sidebar.expander("🔍 Key headline risks", expanded=True):
     if primary not in st.session_state.risk_cache:
         with st.spinner("Scanning web…"):
@@ -490,20 +489,20 @@ with st.sidebar.expander("🔍 Key headline risks", expanded=True):
         key = f"risk_{i}"
         default = True if key not in st.session_state else st.session_state[key]
 
-        # Render checkbox with link inline
-        cols = st.columns([0.1, 0.8, 0.1])  # [checkbox] [title] [ℹ️]
+        cols = st.columns([0.1, 0.8, 0.1])
         with cols[0]:
-            st.session_state[key] = st.checkbox("", key=key, value=default)
+            is_selected = st.checkbox("", key=key, value=default)
         with cols[1]:
             st.markdown(risk)
         with cols[2]:
             st.markdown(f"[ℹ️]({risk_links.get(risk, '#')})")
 
-        if st.session_state[key]:
+        if is_selected:
             selected_risks.append(risk)
 
     st.session_state.selected_risks = selected_risks
     st.session_state.risk_ignore = [r for r in risk_titles if r not in selected_risks]
+
 
 
 # 🔄  Store & show sticky pill
