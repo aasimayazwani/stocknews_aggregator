@@ -312,16 +312,6 @@ experience_to_default = {
     "Expert": ["Put Options", "Collar Strategy", "Inverse ETFs", "Short Selling", "Volatility Hedges", "Commodities", "FX Hedges"]
 }
 
-# Sidebar: Hedge instruments based on experience
-default_instruments = experience_to_default.get(st.session_state.experience_level, [])
-with st.sidebar.expander("🛡️ Allowed Hedge Instruments", expanded=True):
-    allowed_instruments = st.multiselect(
-        "Choose hedge instruments to include",
-        ["Put Options", "Collar Strategy", "Inverse ETFs", "Short Selling", "Volatility Hedges", "Commodities", "FX Hedges"],
-        default=default_instruments,
-        help="Uncheck any hedge types you do not want the LLM to suggest."
-    )
-st.session_state.allowed_instruments = allowed_instruments
 
 # Store in session state
 st.session_state.avoid_dup_hedges = avoid_duplicate_hedges
@@ -512,6 +502,19 @@ with st.sidebar.expander("🧑‍💼  Investor profile", expanded=True):
 st.session_state.experience_level  = experience_level
 st.session_state.explanation_pref  = explanation_pref
 
+default_instruments = experience_to_default.get(st.session_state.experience_level, [])
+
+# Sidebar: Hedge instruments based on experience
+
+with st.sidebar.expander("🛡️ Allowed Hedge Instruments", expanded=True):
+    allowed_instruments = st.multiselect(
+        "Choose hedge instruments to include",
+        ["Put Options", "Collar Strategy", "Inverse ETFs", "Short Selling", "Volatility Hedges", "Commodities", "FX Hedges"],
+        default=default_instruments,
+        help="Uncheck any hedge types you do not want the LLM to suggest."
+    )
+st.session_state.allowed_instruments = allowed_instruments
+
 if "strategy_history" not in st.session_state:
     st.session_state.strategy_history = []
 
@@ -587,21 +590,6 @@ stop_loss_str = "; ".join(
 total_capital = sum(st.session_state.portfolio_alloc.values())
 alloc_str = "; ".join(f"{k}: ${v:,.0f}" for k, v in st.session_state.portfolio_alloc.items()) or "None"
 
-experience_note = {
-    "Beginner":     "Use plain language and define jargon the first time you use it.",
-    "Intermediate": "Assume working knowledge of finance; keep explanations concise.",
-    "Expert":       "Write in professional sell-side style; no hand-holding.",
-}[st.session_state.experience_level]
-
-exp_pref = st.session_state.explanation_pref
-if exp_pref == "Just the strategy":
-    rationale_rule = "Each *Rationale* must be **≤ 25 words (one sentence)**."
-elif exp_pref == "Explain the reasoning":
-    rationale_rule = ("Each *Rationale* must be **2 sentences totalling ≈ 30-50 words** "
-                      "(logic + risk linkage).")
-else:  # Both
-    rationale_rule = ("Each *Rationale* must be **3 sentences totalling ≈ 60-90 words** – "
-                      "1️⃣ logic, 2️⃣ quantitative context, 3️⃣ trade-offs.")
 
 # ❌ Diversification toggle
 if st.session_state.avoid_dup_hedges:
