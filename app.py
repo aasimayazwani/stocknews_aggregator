@@ -112,19 +112,23 @@ model              = DEFAULT_MODEL  # You already imported this
 
 st.markdown("""
 <style>
+/* Style Streamlit dropdowns (selectbox) */
 div[data-baseweb="select"] > div {
-    background-color: #1f2937 !important;
-    border-radius: 12px !important;
-    padding: 4px 12px !important;
-    color: #f1f5f9 !important;
-    font-size: 15px !important;
-    min-height: 40px !important;
-    line-height: 1.4 !important;
+    background-color: #1f2937 !important;     /* Dark background */
+    border-radius: 12px !important;           /* Rounded corners */
+    padding: 4px 12px !important;             /* Inner spacing */
+    color: #f8fafc !important;                /* Text color */
+    font-size: 15px !important;               /* Font size */
+    min-height: 42px !important;              /* Prevent clipping */
+    line-height: 1.4 !important;              /* Balanced line spacing */
     display: flex;
     align-items: center;
+    border: 1px solid #475569 !important;     /* 🎯 Clean visible border */
+    box-shadow: none !important;              /* Remove default shadows */
 }
 </style>
 """, unsafe_allow_html=True)
+
 st.markdown("""
     <style>
       .stMultiSelect > div {
