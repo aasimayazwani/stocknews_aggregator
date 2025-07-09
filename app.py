@@ -529,11 +529,16 @@ if st.button("🗑️ Clear Strategy History"):
     st.rerun()
 
 st.sidebar.markdown(
-    f"<div style='margin-top:6px;padding:4px 8px;border-radius:12px;"
-    f"background:#334155;color:#f8fafc;display:inline-block;font-size:13px;'>"
-    f"{st.session_state.experience_level} • {st.session_state.explanation_pref}</div>",
+    f"""
+    <div style='margin-top:6px;padding:4px 8px;border-radius:12px;
+                background:#334155;color:#f8fafc;display:inline-block;font-size:13px;'>
+        {st.session_state.experience_level} • {st.session_state.explanation_pref} •
+        Hedge cap {hedge_budget_pct}% / {single_hedge_pct}% per-hedge
+    </div>
+    """,
     unsafe_allow_html=True,
 )
+
 
 # ─────────────────────────── STRATEGY DESIGNER ───────────────────────
 st.markdown("### 📝  Strategy Designer")
@@ -673,15 +678,18 @@ if st.session_state.avoid_dup_hedges:
     ```
 
     **Sizing table** — immediately *after* the bullets  
+    #  within your prompt = textwrap.dedent(f""" ... """)
+    **Sizing table** — immediately *after* the bullets  
     ```
     | Hedge | Qty / Contracts | $ Notional | % of Capital |
     |-------|-----------------|-----------:|-------------:|
     | AAPL Aug 175 Puts | 3 contracts | $3 000 | 3 % |
-    | PSQ ETF | 500 sh | $5 000 | 5 % |
-    | … | … | … | … |
-    | **Total** |   | **≤ $15 000** | **≤ 15 %** |
+    | PSQ ETF          | 500 sh       | $5 000 | 5 % |
+    | …                | …            | …      | … |
+    | **Total**        |              | **≤ ${max_hedge_notional:,.0f}** | **≤ {hedge_budget_pct}%** |
     ```
-    • Ensure each row ≤ 5 % and total row ≤ 15 %.  
+    • Ensure each row ≤ {single_hedge_pct}% and total row ≤ {hedge_budget_pct}%.  
+
     • If you recommend futures, show contract size equal to the notional you quote.
 
     **Rules**  
