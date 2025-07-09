@@ -70,6 +70,8 @@ with st.sidebar.expander("🧹 Session Tools", expanded=False):
         st.session_state.portfolio_alloc = {}
     if st.button("🧽 Clear Chat History"):
         st.session_state.chat_history = []
+    if st.button("🗑️ Clear Strategy History"):
+        st.session_state.strategy_history = []
 
 # 🔧 Extract sidebar values into variables
 experience_level   = st.session_state.get("experience_level", "Expert")
@@ -579,13 +581,6 @@ default_instruments = experience_to_default.get(st.session_state.experience_leve
 
 if "strategy_history" not in st.session_state:
     st.session_state.strategy_history = []
-
-if st.button("🗑️ Clear Strategy History"):
-    st.session_state.strategy_history = []
-    st.rerun()
-
-
-
 
 # ─────────────────────────── STRATEGY DESIGNER ───────────────────────
 st.markdown("### 📝  Strategy Designer")
