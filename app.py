@@ -32,7 +32,7 @@ with st.sidebar.expander("⚙️ Strategy Settings", expanded=False):
     st.slider("💰 Total hedge budget (% of capital)", 5, 25, 10, key="total_budget")
     st.slider("📉 Max per single hedge (% of capital)", 1, 10, 5, key="max_hedge")
 
-    st.markdown("---")
+    #st.markdown("---")
     st.markdown("🎯 **Select hedge instruments one by one:**")
 
     # Init session state list
