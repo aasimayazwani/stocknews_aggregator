@@ -619,44 +619,44 @@ if st.session_state.avoid_dup_hedges:
         **Allowed hedge types**: {', '.join(st.session_state.allowed_instruments)}
         Only suggest instruments from the list above. Do **NOT** suggest anything not listed.
 
-        ### Step-by-Step Reasoning  
-        1. **Identify Hedging Targets**  
+        ### Step-by-Step Reasoning
+        1. **Identify Hedging Targets**
         • Flag holdings with  
             – Stop-loss ≥ 5 % above market price, or  
             – High sensitivity to headline risks: {risk_string}.  
-        • Ignore: {ignored}  
+        • Ignore: {ignored}
 
-        2. **Select Instruments**  
+        2. **Select Instruments**
         • Primary – Put options (strike ≤ stop-loss – 2 %; expiry {horizon} ± 0.5 mo).  
-        • Secondary – Shorts / inverse ETFs / futures only if stop-loss buffer ≥ {stop_loss} %.  
+        • Secondary – Shorts / inverse ETFs / futures only if stop-loss buffer ≥ {stop_loss} %.
 
-        3. **Size Positions**  
+        3. **Size Positions**
         • Total hedge budget ≤ 15 % of capital (${total_capital:,.0f}).  
         • Any single hedge ≤ 5 % of capital.  
         • Rebalance to maintain target beta.
 
-        4. **Cost Optimisation**  
+        4. **Cost Optimisation**
         • Aim for option premium ≤ 3 % of notional per hedge.
 
         ---
-        **Context snapshot**  
-        • Basket: {', '.join(basket)}  
-        • Allocation: {alloc_str}  
-        • User stop-losses: {stop_loss_str}  
-        • Horizon: {horizon} mo  
-        • Total capital: ${total_capital:,.0f}  
-        • Portfolio stop-loss buffer (shorts): {stop_loss}%  
+        **Context snapshot**
+        • Basket: {', '.join(basket)}
+        • Allocation: {alloc_str}
+        • User stop-losses: {stop_loss_str}
+        • Horizon: {horizon} mo
+        • Total capital: ${total_capital:,.0f}
+        • Portfolio stop-loss buffer (shorts): {stop_loss} %
 
-        ### Investor profile  
+        ### Investor profile
         Experience: {st.session_state.experience_level} • Detail: {st.session_state.explanation_pref} → {experience_note}
 
         ---
-        ### OUTPUT SPEC *(Markdown only — no tables, no code fences, no HTML)*  
+        ### OUTPUT SPEC *(Markdown only — no tables, no code fences, no HTML)*
 
         **Hedge list** — one numbered bullet per hedge, *exactly* like this template  
         ```
-        1. **AAPL** — Put Option. Buy 3 × Aug $175 puts … (≤ {rationale_rule}) [1]  
-        2. **MSFT** — Short via PSQ ETF … [2]  
+        1. **AAPL** — Put Option. Buy 3 × Aug $175 puts … (≤ {rationale_rule}) [1]
+        2. **MSFT** — Short via PSQ ETF … [2]
         ```
         **Rules**  
         • Each bullet must end with a reference marker like `[1]`.  
@@ -667,8 +667,8 @@ if st.session_state.avoid_dup_hedges:
 
         **Reference list** (immediately after the bullets, one per line)  
         ```
-        [1] https://valid.source/for/aapl  
-        [2] https://another.source/example  
+        [1] https://valid.source/for/aapl
+        [2] https://another.source/example
         ```
 
         **After the references**, add  
@@ -677,6 +677,7 @@ if st.session_state.avoid_dup_hedges:
 
         ❗ Final answer: plain Markdown only.
     """).strip()
+
 
     # 2.  Call OpenAI -----------------------------------------------------------
     with st.spinner("Calling ChatGPT…"):
