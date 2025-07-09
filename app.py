@@ -528,16 +528,7 @@ if st.button("🗑️ Clear Strategy History"):
     st.session_state.strategy_history = []
     st.rerun()
 
-st.sidebar.markdown(
-    f"""
-    <div style='margin-top:6px;padding:4px 8px;border-radius:12px;
-                background:#334155;color:#f8fafc;display:inline-block;font-size:13px;'>
-        {st.session_state.experience_level} • {st.session_state.explanation_pref} •
-        Hedge cap {hedge_budget_pct}% / {single_hedge_pct}% per-hedge
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+
 
 
 # ─────────────────────────── STRATEGY DESIGNER ───────────────────────
@@ -562,6 +553,17 @@ with st.sidebar.expander("⚖️ Risk controls", expanded=True):
 # Make them available everywhere
 st.session_state.hedge_budget_pct = hedge_budget_pct
 st.session_state.single_hedge_pct = single_hedge_pct
+
+st.sidebar.markdown(
+    f"""
+    <div style='margin-top:6px;padding:4px 8px;border-radius:12px;
+                background:#334155;color:#f8fafc;display:inline-block;font-size:13px;'>
+        {st.session_state.experience_level} • {st.session_state.explanation_pref} •
+        Hedge cap {hedge_budget_pct}% / {single_hedge_pct}% per-hedge
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 # ─────────────────────── Strategy generation & rendering ───────────────────────
 if st.button("Suggest strategy", type="primary"):
