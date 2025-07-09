@@ -549,15 +549,15 @@ if "strategy_history" not in st.session_state:
     st.session_state.strategy_history = []
 
 # ─────────────────────────── STRATEGY DESIGNER ───────────────────────
-col1, col2 = st.columns([6, 1])  # Wider column for title
+col1, col2 = st.columns([7, 1])  # Wider column for title
 
 with col1:
     st.markdown("### 📝 Strategy Designer", unsafe_allow_html=True)
 
 with col2:
-    st.markdown("<div style='padding-top: 12px;'>", unsafe_allow_html=True)
+    #st.markdown("<div style='padding-top: 12px;'>", unsafe_allow_html=True)
     suggest_clicked = st.button("Suggest strategy", type="primary", use_container_width=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+    #st.markdown("</div>", unsafe_allow_html=True)
 #sector_guess = yf.Ticker(primary).info.get("sector", "")
 #sector_in    = st.text_input("Sector", sector_guess)
 #goal         = st.selectbox("Positioning goal", ["Long", "Short", "Hedged", "Neutral"])
