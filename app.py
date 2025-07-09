@@ -548,6 +548,16 @@ with st.sidebar.expander("⚖️ Risk controls", expanded=True):
     beta_rng  = st.slider("Beta match band", 0.5, 1.5, (0.8, 1.2), 0.05, key="beta_band")
     stop_loss = st.slider("Stop-loss for shorts (%)", 1, 20, 10, key="stop_loss_slider")
 
+    # NEW — hedge–budget governance
+    hedge_budget_pct  = st.slider("Max hedge budget (% of capital)",
+                                  5, 30, 15, 1, key="hedge_budget_pct")
+    single_hedge_pct  = st.slider("Max per single hedge (% of capital)",
+                                  1, 10, 5, 1, key="single_hedge_pct")
+
+# Make them available everywhere
+st.session_state.hedge_budget_pct = hedge_budget_pct
+st.session_state.single_hedge_pct = single_hedge_pct
+
 # ─────────────────────── Strategy generation & rendering ───────────────────────
 if st.button("Suggest strategy", type="primary"):
     # ─── 1. Collect context values ───────────────────────────
@@ -609,6 +619,9 @@ if st.session_state.avoid_dup_hedges:
         f"({', '.join(st.session_state.portfolio)}).\n"
         "- ✅ Prefer diversifiers (sector ETFs, index futures, inverse ETFs, FX, commodities).\n"
     )
+    total_capital = sum(st.session_state.portfolio_alloc.values())
+    max_hedge_notional = total_capital * hedge_budget_pct / 100
+
 
         # ✅ Build final prompt  (copy–paste over your existing block)
     prompt = textwrap.dedent(f"""
@@ -631,8 +644,8 @@ if st.session_state.avoid_dup_hedges:
        • Secondary – Shorts / inverse ETFs / futures **only** if stop-loss buffer ≥ {stop_loss} %.
 
     3. **Size Positions**
-       • **Total hedge budget ≤ 15 %** of capital (${total_capital:,.0f}).  
-       • **Any single hedge ≤ 5 %** of capital.  
+       • Total hedge budget ≤ {hedge_budget_pct} % of capital (${total_capital:,.0f}).
+       • Any single hedge ≤ {single_hedge_pct} % of capital.
        • Rebalance to maintain target beta.
 
     4. **Cost Optimisation**
