@@ -99,6 +99,16 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+st.markdown("""
+<div style="
+    background-color: #1e1f24;
+    padding: 20px;
+    border-radius: 12px;
+    margin-top: 12px;
+">
+    <h4 style='margin-bottom: 18px;'>📰 Filter Market Headlines</h4>
+""", unsafe_allow_html=True)
+
 st.markdown(
     """
     <style>
