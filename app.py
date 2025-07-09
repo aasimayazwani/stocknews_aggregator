@@ -25,19 +25,39 @@ with st.sidebar.expander("🧮 Investment Settings", expanded=True):
     st.checkbox("🚫 Avoid suggesting same stocks in hedge", value=True, key="avoid_overlap")
 
 with st.sidebar.expander("🎯 Hedge Instruments", expanded=False):
-    st.markdown("Choose instruments to include:")
-    st.multiselect(
-        label="",
-        options=[
-            "Put Options",
-            "Collar Strategy",
-            "Inverse ETFs",
-            "Short Selling",
-            "FX Options",
-        ],
-        default=["Put Options", "Collar Strategy"],
-        key="allowed_instruments"
-    )
+    st.markdown("Select hedge instruments one by one:")
+
+    # Init session state list
+    if "allowed_instruments" not in st.session_state:
+        st.session_state.allowed_instruments = []
+
+    all_options = [
+        "Put Options", "Collar Strategy", "Inverse ETFs", "Short Selling", "FX Options"
+    ]
+
+    available_options = [
+        opt for opt in all_options if opt not in st.session_state.allowed_instruments
+    ]
+
+    # Only show dropdown if options remain
+    if available_options:
+        new_instr = st.selectbox("Choose instrument", available_options, key="instrument_to_add")
+        if st.button("➕ Add Instrument"):
+            st.session_state.allowed_instruments.append(new_instr)
+            st.experimental_rerun()  # force refresh so dropdown hides once empty
+    else:
+        st.success("✅ All instruments added.")
+
+    # Show selected instruments
+    if st.session_state.allowed_instruments:
+        st.markdown("**Included instruments:**")
+        for i in st.session_state.allowed_instruments:
+            st.markdown(f"- ✅ {i}")
+
+        if st.button("🗑️ Clear Instruments"):
+            st.session_state.allowed_instruments = []
+            st.experimental_rerun()
+
 
 with st.sidebar.expander("⚙️ Risk & Budget Controls", expanded=False):
     st.slider("🎯 Beta match band", 0.5, 2.0, (1.15, 1.50), step=0.01, key="beta_band")
