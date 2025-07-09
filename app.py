@@ -531,10 +531,9 @@ if st.button("🗑️ Clear Strategy History"):
 st.sidebar.markdown(
     f"<div style='margin-top:6px;padding:4px 8px;border-radius:12px;"
     f"background:#334155;color:#f8fafc;display:inline-block;font-size:13px;'>"
-    f"{experience_level} • {explanation_pref}</div>",
+    f"{st.session_state.experience_level} • {st.session_state.explanation_pref}</div>",
     unsafe_allow_html=True,
 )
-
 
 # ─────────────────────────── STRATEGY DESIGNER ───────────────────────
 st.markdown("### 📝  Strategy Designer")
