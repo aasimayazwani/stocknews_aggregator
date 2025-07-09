@@ -25,7 +25,7 @@ with st.sidebar.expander("🧮 Investment Settings", expanded=True):
 with st.sidebar.expander("⚙️ Strategy Settings", expanded=False):
 
     # 📆 Horizon & Risk Contro
-    st.checkbox("🚫 Avoid suggesting same stocks in hedge", value=True, key="avoid_overlap")
+    #st.checkbox("🚫 Avoid suggesting same stocks in hedge", value=True, key="avoid_overlap")
 
     st.slider("🎯 Beta match band", 0.5, 2.0, (1.15, 1.50), step=0.01, key="beta_band")
     st.slider("🔻 Stop-loss for shorts (%)", 1, 20, 10, key="stop_loss")
