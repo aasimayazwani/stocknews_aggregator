@@ -16,6 +16,35 @@ from stock_utils import get_stock_summary # your own helper
 # ────────────────────────────────── THEME ─────────────────────────────────
 st.set_page_config(page_title="Hedge Strategy Chatbot", layout="centered")
 
+with st.sidebar.expander("📌 Investor Profile", expanded=False):
+    st.radio("Experience", ["Beginner", "Intermediate", "Expert"], key="experience_level")
+    st.radio("Detail level", ["Just the strategy", "Explain the reasoning", "Both"], key="explanation_pref")
+
+with st.sidebar.expander("🧮 Investment Settings", expanded=True):
+    st.selectbox("Focus stock", options=["AAPL", "MSFT", "TSLA"], key="focus_stock")
+    st.slider("⏳ Time horizon (months)", 1, 24, 6, key="time_horizon")
+    st.checkbox("🚫 Avoid suggesting same stocks in hedge", value=True, key="avoid_overlap")
+
+with st.sidebar.expander("🎯 Hedge Instruments", expanded=False):
+    st.multiselect(
+        "Choose instruments to include:",
+        options=["Put Options", "Collar Strategy", "Inverse ETFs", "Short Selling", "FX Options"],
+        default=["Put Options", "Collar Strategy"],
+        key="allowed_instruments"
+    )
+
+with st.sidebar.expander("⚙️ Risk & Budget Controls", expanded=False):
+    st.slider("🎯 Beta match band", 0.5, 2.0, (1.15, 1.50), step=0.01, key="beta_band")
+    st.slider("🔻 Stop-loss for shorts (%)", 1, 20, 10, key="stop_loss")
+    st.slider("💰 Total hedge budget (% of capital)", 5, 25, 10, key="total_budget")
+    st.slider("📉 Max per single hedge (% of capital)", 1, 10, 5, key="max_hedge")
+
+with st.sidebar.expander("🧹 Session Tools", expanded=False):
+    if st.button("🗑️ Clear Portfolio"):
+        st.session_state.portfolio_alloc = {}
+    if st.button("🧽 Clear Chat History"):
+        st.session_state.chat_history = []
+
 st.markdown(
     """
     <style>
