@@ -562,6 +562,8 @@ if st.button("Suggest strategy", type="primary"):
     st.session_state.experience_level  = experience_level
     st.session_state.explanation_pref  = explanation_pref
 
+    exp_pref = st.session_state.explanation_pref  # ← Add this line
+
     experience_note = {
         "Beginner":     "Use plain language and define jargon the first time you use it.",
         "Intermediate": "Assume working knowledge of finance; keep explanations concise.",
@@ -572,13 +574,15 @@ if st.button("Suggest strategy", type="primary"):
         rationale_rule = "Each *Rationale* must be **≤ 25 words (one sentence)**."
     elif exp_pref == "Explain the reasoning":
         rationale_rule = ("Each *Rationale* must be **2 sentences totalling ≈ 30-50 words** "
-                          "(logic + risk linkage).")
-    else:                   # "Both"
+                        "(logic + risk linkage).")
+    else:  # "Both"
         rationale_rule = ("Each *Rationale* must be **3 sentences totalling ≈ 60-90 words** – "
-                          "1️⃣ logic, 2️⃣ quantitative context, 3️⃣ trade-offs.")
+                        "1️⃣ logic, 2️⃣ quantitative context, 3️⃣ trade-offs.")
+
     stop_loss_str = "; ".join(
         f"{ticker}: ${float(sl):.2f}" for ticker, sl in st.session_state.stop_loss_map.items() if pd.notnull(sl)
     ) or "None"
+
     # --------------------------------------------
 # 🔧  BUILD FINAL PROMPT STRING
 # --------------------------------------------
