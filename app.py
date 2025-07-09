@@ -15,10 +15,7 @@ from stock_utils import get_stock_summary # your own helper
 # ────────────────────────────────── THEME ─────────────────────────────────
 st.set_page_config(page_title="Hedge Strategy Chatbot", layout="centered")
 
-
-
 with st.sidebar.expander("📌 Investor Profile", expanded=False):
-    st.sidebar.markdown("---")  # Optional divider
     suggest_clicked = st.sidebar.button("🚀 Suggest strategy", type="primary", use_container_width=True)
     st.radio("Experience", ["Beginner", "Intermediate", "Expert"], key="experience_level")
     st.radio("Detail level", ["Just the strategy", "Explain the reasoning", "Both"], key="explanation_pref")
