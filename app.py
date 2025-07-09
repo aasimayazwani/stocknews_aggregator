@@ -25,9 +25,16 @@ with st.sidebar.expander("🧮 Investment Settings", expanded=True):
     st.checkbox("🚫 Avoid suggesting same stocks in hedge", value=True, key="avoid_overlap")
 
 with st.sidebar.expander("🎯 Hedge Instruments", expanded=False):
+    st.markdown("Choose instruments to include:")
     st.multiselect(
-        "Choose instruments to include:",
-        options=["Put Options", "Collar Strategy", "Inverse ETFs", "Short Selling", "FX Options"],
+        label="",
+        options=[
+            "Put Options",
+            "Collar Strategy",
+            "Inverse ETFs",
+            "Short Selling",
+            "FX Options",
+        ],
         default=["Put Options", "Collar Strategy"],
         key="allowed_instruments"
     )
@@ -58,6 +65,17 @@ horizon            = st.session_state.get("time_horizon", 6)
 primary            = focus_stock  # Rename for clarity
 model              = DEFAULT_MODEL  # You already imported this
 
+st.markdown("""
+    <style>
+      .stMultiSelect > div {
+        gap: 6px !important;
+        flex-wrap: wrap;
+      }
+      .stMultiSelect span[data-baseweb="tag"] {
+        margin-bottom: 4px;
+      }
+    </style>
+""", unsafe_allow_html=True)
 
 st.markdown(
     """
