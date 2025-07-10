@@ -249,7 +249,22 @@ st.markdown(
 )
 
 
+if "portfolio_df" not in st.session_state:
+    st.session_state.portfolio_df = pd.DataFrame([
+        {"Ticker": "AAPL", "Amount ($)": 10000, "Stop-Loss ($)": "None", "Price": 211.14, "Δ 1d %": 0.54},
+        {"Ticker": "MSFT", "Amount ($)": 10000, "Stop-Loss ($)": "None", "Price": 503.51, "Δ 1d %": 1.39},
+    ])
+
+
 st.title("Equity Strategy Assistant")
+
+st.subheader("📊 Position sizes Editable")
+
+st.session_state.portfolio_df = st.data_editor(
+    st.session_state.portfolio_df,
+    use_container_width=True,
+    disabled=["Ticker", "Price", "Δ 1d %"]
+)
 
 # ─────────────────────────────── STATE ────────────────────────────────
 if "history"     not in st.session_state: st.session_state.history     = []
