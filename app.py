@@ -16,38 +16,72 @@ from stock_utils import get_stock_summary # your own helper
 st.set_page_config(page_title="Hedge Strategy Chatbot", layout="centered")
 
 with st.sidebar.expander("📌 Investor Profile", expanded=False):
-    st.selectbox("Experience", ["Beginner", "Intermediate", "Expert"], key="experience_level")
-    st.selectbox("Detail level", ["Just the strategy", "Explain the reasoning", "Both"], key="explanation_pref")
-    st.slider("⏳ Time horizon (months)", 1, 24, 6, key="time_horizon")
+    # ── Experience ──
+    col1, col2 = st.columns([0.6, 1.0])
+    with col1:
+        st.markdown("**Experience:**")
+    with col2:
+        st.selectbox(
+            label="Experience",
+            options=["Beginner", "Intermediate", "Expert"],
+            key="experience_level",
+            label_visibility="collapsed"
+        )
 
-    # Experience-based defaults
+    # ── Detail Level ──
+    col3, col4 = st.columns([0.6, 1.0])
+    with col3:
+        st.markdown("**Detail level:**")
+    with col4:
+        st.selectbox(
+            label="Detail level",
+            options=["Just the strategy", "Explain the reasoning", "Both"],
+            key="explanation_pref",
+            label_visibility="collapsed"
+        )
+
+    # ── Time Horizon ──
+    col5, col6 = st.columns([0.6, 1.0])
+    with col5:
+        st.markdown("**Time horizon:**")
+    with col6:
+        st.slider(
+            label="⏳ Time horizon (months)",
+            min_value=1,
+            max_value=24,
+            value=6,
+            key="time_horizon",
+            label_visibility="collapsed"
+        )
+
+    # ── Experience-based default instruments ──
     experience_defaults = {
         "Beginner": ["Inverse ETFs", "Commodities"],
         "Intermediate": ["Put Options", "Inverse ETFs", "Commodities"],
-        "Expert": ["Put Options", "Collar Strategy", "Inverse ETFs", "Short Selling", "Volatility Hedges", "Commodities", "FX Hedges"]
+        "Expert": [
+            "Put Options", "Collar Strategy", "Inverse ETFs", "Short Selling",
+            "Volatility Hedges", "Commodities", "FX Hedges"
+        ]
     }
 
     all_options = [
-        "Put Options", "Collar Strategy", "Inverse ETFs", "Short Selling", 
+        "Put Options", "Collar Strategy", "Inverse ETFs", "Short Selling",
         "Volatility Hedges", "Commodities", "FX Hedges"
     ]
 
-    # Get current experience
     current_exp = st.session_state.get("experience_level", "Beginner")
 
-    # Reset to default if experience level changed
-    # Only reset allowed_instruments if experience level changed
     if "prev_experience" not in st.session_state or st.session_state.prev_experience != current_exp:
         st.session_state.allowed_instruments = experience_defaults.get(current_exp, [])
         st.session_state.prev_experience = current_exp
 
-    # Multi-select dropdown (let Streamlit handle the key)
     st.multiselect(
         "Allowed hedge instruments:",
         options=all_options,
         default=st.session_state.allowed_instruments,
         key="allowed_instruments"
     )
+
 
 
 with st.sidebar.expander("🧮 Investment Settings", expanded=True):
