@@ -795,21 +795,36 @@ if suggest_clicked:
     })
 
     # 📊 Post-hedge allocation (optional chart)
-    st.dataframe(combined_df.drop(columns=["Rationale"]), use_container_width=True)
+    #st.dataframe(combined_df.drop(columns=["Rationale"]), use_container_width=True)
 
     # ✅ Markdown rationale display (not the table)
     st.markdown("### 📌 Hedge Strategy Rationale")
     st.markdown(plan_md)
 
 # ───────────────────────────── QUICK CHAT ────────────────────────────
-st.divider()
-st.markdown("### 💬  Quick chat")
-for role, msg in st.session_state.history:
-    st.chat_message(role).write(msg)
-
 if q := st.chat_input("Ask anything…"):
     ctx = f"User portfolio: {', '.join(portfolio)}. Focus: {primary}."
     st.session_state.history.append(("user", q))
     ans = ask_openai(model, "You are a helpful market analyst.", ctx + "\n\n" + q)
     st.session_state.history.append(("assistant", ans))
+
+    # 🔽 Add portfolio update logic here
+    if "add" in q.lower() and "nflx" in q.lower():
+        ticker = "NFLX"
+        amount = 2000
+        price = 800.00
+        delta = 0.0
+
+        new_row = {
+            "Ticker": ticker,
+            "Amount ($)": amount,
+            "Stop-Loss ($)": "None",
+            "Price": price,
+            "Δ 1d %": delta
+        }
+
+        df = st.session_state.portfolio_df
+        if ticker not in df["Ticker"].values:
+            st.session_state.portfolio_df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+
     st.rerun()
