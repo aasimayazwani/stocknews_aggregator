@@ -1,14 +1,11 @@
-# app.py – Market-Movement Chatbot  (portfolio-aware + risk-scan edition)
 from __future__ import annotations
 import re, textwrap, requests
 from typing import List
-import requests
 import os
+import streamlit as st
 import pandas as pd
 import plotly.express as px
-import streamlit as st
 import yfinance as yf
-
 from config import DEFAULT_MODEL          # local module
 from openai_client import ask_openai      # wrapper around OpenAI API
 from stock_utils import get_stock_summary # your own helper
@@ -76,17 +73,10 @@ with st.sidebar.expander("📌 Investor Profile", expanded=False):
 with st.sidebar.expander("🧮 Investment Settings", expanded=True):
     st.selectbox("Focus stock", options=["AAPL", "MSFT", "TSLA"], key="focus_stock")
 with st.sidebar.expander("⚙️ Strategy Settings", expanded=False):
-
-    # 📆 Horizon & Risk Contro
-    #st.checkbox("🚫 Avoid suggesting same stocks in hedge", value=True, key="avoid_overlap")
-
     st.slider("🎯 Beta match band", 0.5, 2.0, (1.15, 1.50), step=0.01, key="beta_band")
     st.slider("🔻 Stop-loss for shorts (%)", 1, 20, 10, key="stop_loss")
     st.slider("💰 Total hedge budget (% of capital)", 5, 25, 10, key="total_budget")
     st.slider("📉 Max per single hedge (% of capital)", 1, 10, 5, key="max_hedge")
-
-    #st.markdown("---")
-    
 
 with st.sidebar.expander("🧹 Session Tools", expanded=False):
     with st.sidebar.expander("🧠 Previous Strategies", expanded=True):
@@ -135,7 +125,8 @@ model              = DEFAULT_MODEL  # You already imported this
 
 st.markdown("""
 <style>
-div[data-baseweb="select"] > div {
+  /* 🎨 Select and Multiselect Styling */
+  div[data-baseweb="select"] > div {
     background-color: #1f2937 !important;
     border-radius: 12px !important;
     padding: 4px 12px !important;
@@ -145,128 +136,121 @@ div[data-baseweb="select"] > div {
     line-height: 1.4 !important;
     display: flex;
     align-items: center;
-}
+  }
+
+  .stMultiSelect > div {
+    gap: 4px !important;
+    flex-wrap: wrap;
+    padding: 2px !important;
+  }
+
+  .stMultiSelect span[data-baseweb="tag"] {
+    margin-bottom: 4px !important;
+    font-size: 13px !important;
+    padding: 4px 8px !important;
+    border-radius: 12px !important;
+  }
+
+  /* 🧱 Card Component */
+  .card {
+    background: #1e1f24;
+    padding: 18px;
+    border-radius: 12px;
+    margin-bottom: 18px;
+  }
+
+  /* 🔷 Ticker Chip Badge */
+  .chip {
+    display: inline-block;
+    margin: 0 6px 6px 0;
+    padding: 4px 10px;
+    border-radius: 14px;
+    background: #33415588;
+    color: #f1f5f9;
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  /* 📊 Metric Display */
+  .metric {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .metric-small {
+    font-size: 14px;
+  }
+
+  /* 🏷️ Label Styling */
+  label {
+    font-weight: 600;
+    font-size: 0.88rem;
+  }
+
+  /* ⚠️ Risk Section Grid */
+  .risk-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+    margin-top: 10px;
+    margin-bottom: 16px;
+  }
+
+  .risk-card {
+    background-color: #1f2937;
+    border-radius: 10px;
+    padding: 12px 16px;
+    color: #f8fafc;
+    box-shadow: 0 0 0 1px #33415544;
+    transition: background 0.2s ease-in-out;
+  }
+
+  .risk-card:hover {
+    background-color: #273449;
+  }
+
+  .risk-card label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 14px;
+    font-weight: 500;
+    margin: 0;
+    cursor: pointer;
+  }
+
+  .risk-card input[type="checkbox"] {
+    margin-right: 10px;
+    transform: scale(1.2);
+    accent-color: #10b981;
+  }
+
+  .risk-card a {
+    color: #60a5fa;
+    text-decoration: none;
+    font-size: 14px;
+    margin-left: 12px;
+  }
+
+  .risk-card a:hover {
+    text-decoration: underline;
+  }
+
+  .risk-card i {
+    font-style: normal;
+    font-size: 13px;
+    color: #60a5fa;
+    margin-left: 6px;
+  }
+
+  /* 🧼 Misc. Clean-up */
+  h3 {
+    margin-top: 0;
+    margin-bottom: 0;
+  }
 </style>
 """, unsafe_allow_html=True)
-st.markdown("""
-    <style>
-      .stMultiSelect > div {
-        gap: 6px !important;
-        flex-wrap: wrap;
-      }
-      .stMultiSelect span[data-baseweb="tag"] {
-        margin-bottom: 4px;
-      }
-    </style>
-""", unsafe_allow_html=True)
-
-st.markdown("<style>h3 { margin-top: 0; margin-bottom: 0; }</style>", unsafe_allow_html=True)
-
-st.markdown(
-    """
-    <style>
-      /* General card styling */
-      .card {
-        background: #1e1f24;
-        padding: 18px;
-        border-radius: 12px;
-        margin-bottom: 18px;
-      }
-
-      /* Ticker chip badge */
-      .chip {
-        display: inline-block;
-        margin: 0 6px 6px 0;
-        padding: 4px 10px;
-        border-radius: 14px;
-        background: #33415588;
-        color: #f1f5f9;
-        font-weight: 600;
-        font-size: 13px;
-      }
-
-      /* Metrics (price % changes) */
-      .metric {
-        font-size: 18px;
-        font-weight: 600;
-        margin-bottom: 2px;
-      }
-
-      .metric-small {
-        font-size: 14px;
-      }
-
-      /* Label style for form fields */
-      label {
-        font-weight: 600;
-        font-size: 0.88rem;
-      }
-
-      /* Risk section grid layout */
-      .risk-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-        gap: 12px;
-        margin-top: 10px;
-        margin-bottom: 16px;
-      }
-
-      /* Individual risk card */
-      .risk-card {
-        background-color: #1f2937;
-        border-radius: 10px;
-        padding: 12px 16px;
-        color: #f8fafc;
-        box-shadow: 0 0 0 1px #33415544;
-        transition: background 0.2s ease-in-out;
-      }
-
-      .risk-card:hover {
-        background-color: #273449;
-      }
-
-      /* Checkbox label inside card */
-      .risk-card label {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        font-size: 14px;
-        font-weight: 500;
-        width: 100%;
-        margin: 0;
-        cursor: pointer;
-      }
-
-      .risk-card input[type="checkbox"] {
-        margin-right: 10px;
-        transform: scale(1.2);
-        accent-color: #10b981; /* Tailwind green-500 */
-      }
-
-      /* Link icon inside card */
-      .risk-card a {
-        color: #60a5fa;
-        text-decoration: none;
-        font-size: 14px;
-        margin-left: 12px;
-      }
-
-      .risk-card a:hover {
-        text-decoration: underline;
-      }
-
-      /* Optional: icon if used */
-      .risk-card i {
-        font-style: normal;
-        font-size: 13px;
-        color: #60a5fa;
-        margin-left: 6px;
-      }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
 
 st.title("Equity Strategy Assistant")
 
@@ -370,9 +354,7 @@ def fetch_prices(tickers: List[str], period="2d"):
     df = yf.download(tickers, period=period, progress=False)["Close"]
     return df.dropna(axis=1, how="all")
 
-import os
-import requests
-import streamlit as st
+
 
 @st.cache_data(ttl=900, show_spinner=False)
 def web_risk_scan(ticker: str):
@@ -563,12 +545,6 @@ with st.sidebar.expander("🔍 Key headline risks", expanded=True):
     st.session_state.selected_risks = selected_risks
     st.session_state.risk_ignore = [r for r in risk_titles if r not in selected_risks]
 
-
-
-# 🔄  Store & show sticky pill
-#st.session_state.experience_level  = experience_level
-#st.session_state.explanation_pref  = explanation_pref
-
 experience_to_default = {
     "Beginner": ["Inverse ETFs", "Commodities"],
     "Intermediate": ["Put Options", "Inverse ETFs", "Commodities"],
@@ -582,16 +558,6 @@ default_instruments = experience_to_default.get(st.session_state.experience_leve
 if "strategy_history" not in st.session_state:
     st.session_state.strategy_history = []
 
-# ─────────────────────────── STRATEGY DESIGNER ───────────────────────
-
-    #st.markdown("</div>", unsafe_allow_html=True)
-#sector_guess = yf.Ticker(primary).info.get("sector", "")
-#sector_in    = st.text_input("Sector", sector_guess)
-#goal         = st.selectbox("Positioning goal", ["Long", "Short", "Hedged", "Neutral"])
-#avoid_sym    = st.text_input("Hedge / avoid ticker", primary)
-#capital      = st.number_input("Capital (USD)", 1000, 1_000_000, 10_000, 1000)
-#horizon      = st.slider("Time horizon (months)", 1, 24, 6)
-
 # Strategy generation & rendering
 if suggest_clicked:
     # 1. Collect context values
@@ -600,9 +566,6 @@ if suggest_clicked:
     risk_string = ", ".join(risk_titles) or "None"
     alloc_str = "; ".join(f"{k}: ${v:,.0f}" for k, v in st.session_state.portfolio_alloc.items()) or "None"
 
-    # 2. Dynamic tone-/length guidance
-    #st.session_state.experience_level = experience_level
-    #st.session_state.explanation_pref = explanation_pref
     exp_pref = st.session_state.explanation_pref
 
     experience_note = {
@@ -612,9 +575,9 @@ if suggest_clicked:
     }[st.session_state.experience_level]
 
     if exp_pref == "Just the strategy":
-        rationale_rule = "Each *Rationale* must be **≤ 25 words (one sentence)**."
+        rationale_rule = "Each *Rationale* must be **≤ 25 words (one-two sentence)**."
     elif exp_pref == "Explain the reasoning":
-        rationale_rule = ("Each *Rationale* must be **2 sentences totalling ≈ 30-50 words** "
+        rationale_rule = ("Each *Rationale* must be **2 sentences totalling ≈ 30-60 words** "
                           "(logic + risk linkage).")
     else:  # "Both"
         rationale_rule = ("Each *Rationale* must be **3 sentences totalling ≈ 60-90 words** – "
@@ -638,84 +601,74 @@ if suggest_clicked:
 
     # Build final prompt
     prompt = textwrap.dedent(f"""
-        Act as a **tactical hedging strategist**.  
-        Goal: *preserve capital* while keeping portfolio beta inside **{beta_rng[0]:.2f}–{beta_rng[1]:.2f}**.
+    👋  You are a **Hedging Strategist** helping investors protect capital while keeping portfolio beta between **{beta_rng[0]:.2f} – {beta_rng[1]:.2f}**.
 
-        {avoid_note}
-        **Allowed hedge types**: {', '.join(st.session_state.allowed_instruments)}
-        Only suggest instruments from the list above. Do **NOT** suggest anything not listed.
+    ─────────────────────────────────
+    🔑 **Key Instructions**
 
-        ### Step-by-Step Reasoning
-        1. **Identify Hedging Targets**  
-        • Flag holdings with  
-            – Stop-loss ≥ 5 % above market price, **or**  
-            – High sensitivity to headline risks: {risk_string}.  
-        • Ignore: {ignored}
+    1. **Hedging Scope**  
+    • Primary target: **{primary}**  
+    • Scope selected by user: **{st.session_state.hedge_scope}**  
+        – *Focus Stock Only* → hedge **{primary}** exclusively.  
+        – *Entire Portfolio* → hedge all positions shown below.
 
-        2. **Select Instruments**  
-        • Primary – Put options (strike ≤ stop-loss – 2 %; expiry {horizon} ± 0.5 mo).  
-        • Secondary – Shorts / inverse ETFs / futures **only** if stop-loss buffer ≥ {stop_loss} %.
+    2. **Allowed Hedge Types**  
+    {', '.join(st.session_state.allowed_instruments)}  
+    *Use only these. Do **NOT** propose anything else.*
 
-        3. **Size Positions**  
-        • **Total hedge budget ≤ {hedge_budget_pct} %** of capital (${total_capital:,.0f}).  
-        • **Any single hedge ≤ {single_hedge_pct} %** of capital.  
-        • Rebalance to maintain target beta.
+    3. **Budget & Sizing Rules**  
+    • Total hedge cost ≤ **{hedge_budget_pct}%** of capital (${total_capital:,.0f})  
+    • Any single hedge ≤ **{single_hedge_pct}%** of capital  
+    • Option premium target ≤ **3 %** of notional  
+    • Max 5 hedges
 
-        4. **Cost Optimisation**  
-        • Aim for option premium ≤ 3 % of notional per hedge.
+    4. **When to Hedge**  
+    Flag a position if:  
+    • Its stop-loss sits ≥ 5 % above market **or**  
+    • It shows high headline-risk sensitivity: {risk_string}  
+    Ignore: {ignored}
 
-        ---
-        **Context snapshot**  
-        • Basket: {', '.join(basket)}  
-        • Allocation: {alloc_str}  
-        • User stop-losses: {stop_loss_str}  
-        • Horizon: {horizon} mo  
-        • Total capital: ${total_capital:,.0f}  
-        • Portfolio stop-loss buffer (shorts): {stop_loss} %
+    ─────────────────────────────────
+    📊 **Portfolio Snapshot**
 
-        ### Investor profile  
-        Experience: {st.session_state.experience_level} • Detail: {st.session_state.explanation_pref} → {experience_note}
+    • Positions: {', '.join(portfolio)}  
+    • Allocation: {alloc_str}  
+    • Stop-losses: {stop_loss_str or 'None'}  
+    • Horizon: **{horizon} mo** • Capital: **${total_capital:,.0f}**
 
-        ---
-        ### OUTPUT SPEC *(Markdown only — no tables, no code fences, no HTML)*
+    ─────────────────────────────────
+    📝 **Deliverables (Markdown only)**
 
-        **Hedge list** — one numbered bullet per hedge, *exactly* like this template  
-        ```
-        1. **AAPL** — Put Option. Buy 3 × Aug $175 puts … (≤ {rationale_rule}) [1]  
-        2. **MSFT** — Short via PSQ ETF … [2]  
-        ```
+    **A. Hedge List** – one bullet per idea, end each with reference tag `[n]`  
+    `1. **AAPL** — Put. Buy 3× Aug 175P (≤ {rationale_rule}) [1]`
 
-        **Sizing table** — immediately *after* the bullets  
-        ```
-        | Hedge | Qty / Contracts | $ Notional | % of Capital |
-        |-------|-----------------|-----------:|-------------:|
-        | AAPL Aug 175 Puts | 3 contracts | $3 000 | 3 % |
-        | PSQ ETF          | 500 sh       | $5 000 | 5 % |
-        | …                | …            | …      | … |
-        | **Total**        |              | **≤ ${max_hedge_notional:,.0f}** | **≤ {hedge_budget_pct}%** |
-        ```
-        • Ensure each row ≤ {single_hedge_pct}% and total row ≤ {hedge_budget_pct}%.  
-        • If you recommend futures, show contract size equal to the notional you quote.
+    **B. Sizing Table** – immediately after bullets  
+    ```
 
-        **Rules**  
-        • Each bullet ends with a reference marker like `[1]`.  
-        • {rationale_rule}  
-        • If an option, include strike / expiry / premium / # contracts in the bullet.  
-        • Do **not** suggest tickers already in the user’s portfolio if diversification is required.  
-        • Limit to **5 hedges maximum**.
+    | Hedge                 | Qty / Cts |                   \$ Notional |               % Capital |
+    | --------------------- | --------- | ----------------------------: | ----------------------: |
+    | AAPL Aug 175 P (puts) | 3         |                         3 000 |                     3 % |
+    | …                     | …         |                             … |                       … |
+    | **Total**             |           | ≤ {max\_hedge\_notional:,.0f} | ≤ {hedge\_budget\_pct}% |
 
-        **Reference list** (immediately after the sizing table, one per line)  
-        ```
-        [1] https://valid.source/for/aapl  
-        [2] https://another.source/example  
-        ```
+    ```
 
-        **After the references**, add  
-        1. `### Summary` — ≤ 300 characters.  
-        2. `### Residual Risks` — numbered list, each risk ≤ 25 words **and** ending with its own URL.
+    **C. References**  
+    `[1] https://source.example`
 
-        ❗ Final answer: plain Markdown only.
+    **D. Summary** – ≤ 300 chars
+
+    **E. Residual Risks** – numbered list, ≤ 25 words each, each ending in a URL
+
+    ─────────────────────────────────
+    👤 **Investor Profile**
+
+    Experience: **{st.session_state.experience_level}**  
+    Detail level: **{st.session_state.explanation_pref}**
+
+    Return the answer in plain Markdown, no HTML or code fences.
     """).strip()
+
 
     # 2.  Call OpenAI -----------------------------------------------------------
     with st.spinner("Calling ChatGPT…"):
