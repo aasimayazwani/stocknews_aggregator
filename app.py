@@ -112,23 +112,19 @@ model              = DEFAULT_MODEL  # You already imported this
 
 st.markdown("""
 <style>
-/* Style Streamlit dropdowns (selectbox) */
 div[data-baseweb="select"] > div {
-    background-color: #1f2937 !important;     /* Dark background */
-    border-radius: 12px !important;           /* Rounded corners */
-    padding: 4px 12px !important;             /* Inner spacing */
-    color: #f8fafc !important;                /* Text color */
-    font-size: 15px !important;               /* Font size */
-    min-height: 42px !important;              /* Prevent clipping */
-    line-height: 1.4 !important;              /* Balanced line spacing */
+    background-color: #1f2937 !important;
+    border-radius: 12px !important;
+    padding: 4px 12px !important;
+    color: #f1f5f9 !important;
+    font-size: 15px !important;
+    min-height: 40px !important;
+    line-height: 1.4 !important;
     display: flex;
     align-items: center;
-    border: 1px solid #475569 !important;     /* 🎯 Clean visible border */
-    box-shadow: none !important;              /* Remove default shadows */
 }
 </style>
 """, unsafe_allow_html=True)
-
 st.markdown("""
     <style>
       .stMultiSelect > div {
@@ -249,22 +245,7 @@ st.markdown(
 )
 
 
-if "portfolio_df" not in st.session_state:
-    st.session_state.portfolio_df = pd.DataFrame([
-        {"Ticker": "AAPL", "Amount ($)": 10000, "Stop-Loss ($)": "None", "Price": 211.14, "Δ 1d %": 0.54},
-        {"Ticker": "MSFT", "Amount ($)": 10000, "Stop-Loss ($)": "None", "Price": 503.51, "Δ 1d %": 1.39},
-    ])
-
-
 st.title("Equity Strategy Assistant")
-
-st.subheader("📊 Position sizes Editable")
-
-st.session_state.portfolio_df = st.data_editor(
-    st.session_state.portfolio_df,
-    use_container_width=True,
-    disabled=["Ticker", "Price", "Δ 1d %"]
-)
 
 # ─────────────────────────────── STATE ────────────────────────────────
 if "history"     not in st.session_state: st.session_state.history     = []
@@ -795,7 +776,7 @@ if suggest_clicked:
     })
 
     # 📊 Post-hedge allocation (optional chart)
-    #st.dataframe(combined_df.drop(columns=["Rationale"]), use_container_width=True)
+    st.dataframe(combined_df.drop(columns=["Rationale"]), use_container_width=True)
 
     # ✅ Markdown rationale display (not the table)
     st.markdown("### 📌 Hedge Strategy Rationale")
