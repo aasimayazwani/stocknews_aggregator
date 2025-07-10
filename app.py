@@ -36,20 +36,19 @@ with st.sidebar.expander("📌 Investor Profile", expanded=False):
     current_exp = st.session_state.get("experience_level", "Beginner")
 
     # Reset to default if experience level changed
+    # Only reset allowed_instruments if experience level changed
     if "prev_experience" not in st.session_state or st.session_state.prev_experience != current_exp:
         st.session_state.allowed_instruments = experience_defaults.get(current_exp, [])
         st.session_state.prev_experience = current_exp
 
-    # Multi-select dropdown
-    selected = st.multiselect(
+    # Multi-select dropdown (let Streamlit handle the key)
+    st.multiselect(
         "Allowed hedge instruments:",
         options=all_options,
         default=st.session_state.allowed_instruments,
         key="allowed_instruments"
     )
 
-    # Update session state if user changes selection manually
-    st.session_state.allowed_instruments = selected
 
 with st.sidebar.expander("🧮 Investment Settings", expanded=True):
     st.selectbox("Focus stock", options=["AAPL", "MSFT", "TSLA"], key="focus_stock")
