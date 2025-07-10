@@ -20,52 +20,58 @@ with st.sidebar.expander("📌 Investor Profile", expanded=False):
     experience = st.selectbox(
         label="",
         options=["Beginner", "Intermediate", "Expert"],
-        index=["Beginner", "Intermediate", "Expert"].index(
-            st.session_state.get("experience_level", "Expert")
-        ),
+        index=["Beginner", "Intermediate", "Expert"].index(st.session_state.get("experience_level", "Expert")),
         format_func=lambda x: f"Experience: {x}",
         key="experience_level"
     )
 
     # Detail level
-    st.selectbox(
+    detail_level = st.selectbox(
         label="",
         options=["Just the strategy", "Explain the reasoning", "Both"],
-        index=["Just the strategy", "Explain the reasoning", "Both"].index(
-            st.session_state.get("explanation_pref", "Just the strategy")
-        ),
+        index=["Just the strategy", "Explain the reasoning", "Both"].index(st.session_state.get("explanation_pref", "Just the strategy")),
         format_func=lambda x: f"Detail level: {x}",
         key="explanation_pref"
     )
 
-    st.slider("Time horizon (months):", 1, 24, st.session_state.get("time_horizon", 6), key="time_horizon")
+    # Time horizon
+    horizon = st.slider(
+        label="Time horizon (months):",
+        min_value=1,
+        max_value=24,
+        value=st.session_state.get("time_horizon", 6),
+        key="time_horizon"
+    )
 
-    # Allowed hedge instruments (cascading style)
+    # ── Experience-based default instruments ──
+    experience_defaults = {
+        "Beginner": ["Inverse ETFs", "Commodities"],
+        "Intermediate": ["Put Options", "Inverse ETFs", "Commodities"],
+        "Expert": [
+            "Put Options", "Collar Strategy", "Inverse ETFs", "Short Selling",
+            "Volatility Hedges", "Commodities", "FX Hedges"
+        ]
+    }
+
     all_options = [
         "Put Options", "Collar Strategy", "Inverse ETFs", "Short Selling",
         "Volatility Hedges", "Commodities", "FX Hedges"
     ]
 
-    if "allowed_instruments" not in st.session_state:
-        st.session_state.allowed_instruments = []
+    current_exp = st.session_state.get("experience_level", "Beginner")
 
-    # Show the add-one-at-a-time dropdown
-    add_instr = st.selectbox("➕ Add hedge instrument", [""] + [opt for opt in all_options if opt not in st.session_state.allowed_instruments])
-    if add_instr and add_instr not in st.session_state.allowed_instruments:
-        st.session_state.allowed_instruments.append(add_instr)
-        st.rerun()  # Refresh to update the list immediately
+    if "prev_experience" not in st.session_state or st.session_state.prev_experience != current_exp:
+        st.session_state.allowed_instruments = experience_defaults.get(current_exp, [])
+        st.session_state.prev_experience = current_exp
 
-    # Show current selections with remove buttons
-    if st.session_state.allowed_instruments:
-        st.markdown("**Selected instruments:**")
-        for i, instr in enumerate(st.session_state.allowed_instruments):
-            cols = st.columns([0.85, 0.15])
-            with cols[0]:
-                st.markdown(f"• {instr}")
-            with cols[1]:
-                if st.button("❌", key=f"remove_instr_{i}"):
-                    st.session_state.allowed_instruments.remove(instr)
-                    st.rerun()
+    st.multiselect(
+        "Allowed hedge instruments:",
+        options=all_options,
+        default=st.session_state.allowed_instruments,
+        key="allowed_instruments"
+    )
+
+
 
 with st.sidebar.expander("🧮 Investment Settings", expanded=True):
     st.selectbox("Focus stock", options=["AAPL", "MSFT", "TSLA"], key="focus_stock")
