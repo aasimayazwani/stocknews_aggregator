@@ -19,22 +19,7 @@ with st.sidebar.expander("📌 Investor Profile", expanded=False):
     st.selectbox("Experience", ["Beginner", "Intermediate", "Expert"], key="experience_level")
     st.selectbox("Detail level", ["Just the strategy", "Explain the reasoning", "Both"], key="explanation_pref")
     st.slider("⏳ Time horizon (months)", 1, 24, 6, key="time_horizon")
-
-with st.sidebar.expander("🧮 Investment Settings", expanded=True):
-    st.selectbox("Focus stock", options=["AAPL", "MSFT", "TSLA"], key="focus_stock")
-with st.sidebar.expander("⚙️ Strategy Settings", expanded=False):
-
-    # 📆 Horizon & Risk Contro
-    #st.checkbox("🚫 Avoid suggesting same stocks in hedge", value=True, key="avoid_overlap")
-
-    st.slider("🎯 Beta match band", 0.5, 2.0, (1.15, 1.50), step=0.01, key="beta_band")
-    st.slider("🔻 Stop-loss for shorts (%)", 1, 20, 10, key="stop_loss")
-    st.slider("💰 Total hedge budget (% of capital)", 5, 25, 10, key="total_budget")
-    st.slider("📉 Max per single hedge (% of capital)", 1, 10, 5, key="max_hedge")
-
-    #st.markdown("---")
     st.markdown("🎯 **Select hedge instruments one by one:**")
-
     # Init session state list
     if "allowed_instruments" not in st.session_state:
         st.session_state.allowed_instruments = []
@@ -64,6 +49,21 @@ with st.sidebar.expander("⚙️ Strategy Settings", expanded=False):
         if st.button("🗑️ Clear Instruments"):
             st.session_state.allowed_instruments = []
             st.experimental_rerun()
+
+with st.sidebar.expander("🧮 Investment Settings", expanded=True):
+    st.selectbox("Focus stock", options=["AAPL", "MSFT", "TSLA"], key="focus_stock")
+with st.sidebar.expander("⚙️ Strategy Settings", expanded=False):
+
+    # 📆 Horizon & Risk Contro
+    #st.checkbox("🚫 Avoid suggesting same stocks in hedge", value=True, key="avoid_overlap")
+
+    st.slider("🎯 Beta match band", 0.5, 2.0, (1.15, 1.50), step=0.01, key="beta_band")
+    st.slider("🔻 Stop-loss for shorts (%)", 1, 20, 10, key="stop_loss")
+    st.slider("💰 Total hedge budget (% of capital)", 5, 25, 10, key="total_budget")
+    st.slider("📉 Max per single hedge (% of capital)", 1, 10, 5, key="max_hedge")
+
+    #st.markdown("---")
+    
 
 with st.sidebar.expander("🧹 Session Tools", expanded=False):
     with st.sidebar.expander("🧠 Previous Strategies", expanded=True):
