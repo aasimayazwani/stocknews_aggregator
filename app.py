@@ -645,11 +645,11 @@ if suggest_clicked:
     **B. Sizing Table** – immediately after bullets  
     ```
 
-    | Hedge                 | Qty / Cts |                   \$ Notional |               % Capital |
-    | --------------------- | --------- | ----------------------------: | ----------------------: |
-    | AAPL Aug 175 P (puts) | 3         |                         3 000 |                     3 % |
-    | …                     | …         |                             … |                       … |
-    | **Total**             |           | ≤ {max\_hedge\_notional:,.0f} | ≤ {hedge\_budget\_pct}% |
+| Hedge                 | Qty / Cts |                   \$ Notional |               % Capital |
+| --------------------- | --------- | ----------------------------: | ----------------------: |
+| AAPL Aug 175 P (puts) | 3         |                         3 000 |                     3 % |
+| …                     | …         |                             … |                       … |
+| **Total**             |           | ≤ {max_hedge_notional:,.0f} | ≤ {hedge_budget_pct}% |
 
     ```
 
