@@ -20,7 +20,7 @@ with st.sidebar.expander("📌 Investor Profile", expanded=False):
     experience = st.selectbox(
         label="",
         options=["Beginner", "Intermediate", "Expert"],
-        index=["Beginner", "Intermediate", "Expert"].index(st.session_state.get("experience_level", "Expert")),
+        index=["Beginner", "Intermediate", "Expert"].index(st.session_state.get("experience_level")),
         format_func=lambda x: f"Experience: {x}",
         key="experience_level"
     )
@@ -29,7 +29,7 @@ with st.sidebar.expander("📌 Investor Profile", expanded=False):
     detail_level = st.selectbox(
         label="",
         options=["Just the strategy", "Explain the reasoning", "Both"],
-        index=["Just the strategy", "Explain the reasoning", "Both"].index(st.session_state.get("explanation_pref", "Just the strategy")),
+        index=["Just the strategy", "Explain the reasoning", "Both"].index(st.session_state.get("explanation_pref")),
         format_func=lambda x: f"Detail level: {x}",
         key="explanation_pref"
     )
