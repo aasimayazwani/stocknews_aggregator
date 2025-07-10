@@ -19,36 +19,54 @@ with st.sidebar.expander("📌 Investor Profile", expanded=False):
     st.selectbox("Experience", ["Beginner", "Intermediate", "Expert"], key="experience_level")
     st.selectbox("Detail level", ["Just the strategy", "Explain the reasoning", "Both"], key="explanation_pref")
     st.slider("⏳ Time horizon (months)", 1, 24, 6, key="time_horizon")
+
     st.markdown("🎯 **Select hedge instruments one by one:**")
-    # Init session state list
-    if "allowed_instruments" not in st.session_state:
-        st.session_state.allowed_instruments = []
+
+    # Experience-based default instruments
+    experience_defaults = {
+        "Beginner": ["Inverse ETFs", "Commodities"],
+        "Intermediate": ["Put Options", "Inverse ETFs", "Commodities"],
+        "Expert": ["Put Options", "Collar Strategy", "Inverse ETFs", "Short Selling", "Volatility Hedges", "Commodities", "FX Hedges"]
+    }
+
+    current_exp = st.session_state.get("experience_level", "Beginner")
+
+    # Initialize or update allowed instruments if experience level changed
+    if "prev_experience" not in st.session_state or st.session_state.prev_experience != current_exp:
+        st.session_state.allowed_instruments = experience_defaults.get(current_exp, [])
+        st.session_state.prev_experience = current_exp
 
     all_options = [
-        "Put Options", "Collar Strategy", "Inverse ETFs", "Short Selling", "FX Options"
+        "Put Options", "Collar Strategy", "Inverse ETFs", "Short Selling", "FX Options",
+        "Volatility Hedges", "Commodities"
     ]
     available_options = [
         opt for opt in all_options if opt not in st.session_state.allowed_instruments
     ]
 
-    # Dropdown to add instrument
+    # Dropdown to add a new instrument
     if available_options:
         new_instr = st.selectbox("Choose instrument", available_options, key="instrument_to_add")
         if st.button("➕ Add Instrument"):
-            st.session_state.allowed_instruments.append(new_instr)
-            st.experimental_rerun()
-    else:
-        st.success("✅ All instruments added.")
+            if new_instr not in st.session_state.allowed_instruments:
+                st.session_state.allowed_instruments.append(new_instr)
+                st.session_state.instrument_added = True
+                st.experimental_rerun()
 
-    # Display included instruments
+    # Clear the rerun flag (post-rerun)
+    if "instrument_added" in st.session_state:
+        del st.session_state.instrument_added
+
+    # Display selected instruments
     if st.session_state.allowed_instruments:
         st.markdown("**Included instruments:**")
-        for i in st.session_state.allowed_instruments:
-            st.markdown(f"- ✅ {i}")
+        st.markdown("\n".join([f"- ✅ {i}" for i in st.session_state.allowed_instruments]))
 
         if st.button("🗑️ Clear Instruments"):
             st.session_state.allowed_instruments = []
             st.experimental_rerun()
+    else:
+        st.success("✅ All instruments added.")
 
 with st.sidebar.expander("🧮 Investment Settings", expanded=True):
     st.selectbox("Focus stock", options=["AAPL", "MSFT", "TSLA"], key="focus_stock")
