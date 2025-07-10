@@ -16,41 +16,32 @@ from stock_utils import get_stock_summary # your own helper
 st.set_page_config(page_title="Hedge Strategy Chatbot", layout="centered")
 
 with st.sidebar.expander("📌 Investor Profile", expanded=False):
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        st.markdown("**Experience:**")
-    with col2:
-        experience = st.selectbox(
-            label="Experience", 
-            options=["Beginner", "Intermediate", "Expert"], 
-            key="experience_level"
-        )
+    # Experience
+    experience = st.selectbox(
+        label="",
+        options=["Beginner", "Intermediate", "Expert"],
+        index=["Beginner", "Intermediate", "Expert"].index(st.session_state.get("experience_level", "Expert")),
+        format_func=lambda x: f"Experience: {x}",
+        key="experience_level"
+    )
 
-    # ── Detail Level ──
-    col3, col4 = st.columns([0.6, 1.0])
-    with col3:
-        st.markdown("**Detail level:**")
-    with col4:
-        st.selectbox(
-            label="Detail level",
-            options=["Just the strategy", "Explain the reasoning", "Both"],
-            key="explanation_pref",
-            label_visibility="collapsed"
-        )
+    # Detail level
+    detail_level = st.selectbox(
+        label="",
+        options=["Just the strategy", "Explain the reasoning", "Both"],
+        index=["Just the strategy", "Explain the reasoning", "Both"].index(st.session_state.get("explanation_pref", "Just the strategy")),
+        format_func=lambda x: f"Detail level: {x}",
+        key="explanation_pref"
+    )
 
-    # ── Time Horizon ──
-    col5, col6 = st.columns([0.6, 1.0])
-    with col5:
-        st.markdown("**Time horizon:**")
-    with col6:
-        st.slider(
-            label="⏳ Time horizon (months)",
-            min_value=1,
-            max_value=24,
-            value=6,
-            key="time_horizon",
-            label_visibility="collapsed"
-        )
+    # Time horizon
+    horizon = st.slider(
+        label="Time horizon (months):",
+        min_value=1,
+        max_value=24,
+        value=st.session_state.get("time_horizon", 6),
+        key="time_horizon"
+    )
 
     # ── Experience-based default instruments ──
     experience_defaults = {
