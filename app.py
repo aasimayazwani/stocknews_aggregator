@@ -16,16 +16,14 @@ from stock_utils import get_stock_summary # your own helper
 st.set_page_config(page_title="Hedge Strategy Chatbot", layout="centered")
 
 with st.sidebar.expander("📌 Investor Profile", expanded=False):
-    # ── Experience ──
-    col1, col2 = st.columns([0.6, 1.0])
+    col1, col2 = st.columns([1, 2])
     with col1:
         st.markdown("**Experience:**")
     with col2:
-        st.selectbox(
-            label="Experience",
-            options=["Beginner", "Intermediate", "Expert"],
-            key="experience_level",
-            label_visibility="collapsed"
+        experience = st.selectbox(
+            label="Experience", 
+            options=["Beginner", "Intermediate", "Expert"], 
+            key="experience_level"
         )
 
     # ── Detail Level ──
