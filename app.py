@@ -356,7 +356,7 @@ def web_risk_scan(ticker: str):
 if "history"     not in st.session_state: st.session_state.history     = []
 if "portfolio"   not in st.session_state: st.session_state.portfolio   = ["AAPL", "MSFT"]
 if "outlook_md"  not in st.session_state: st.session_state.outlook_md  = None
-if "risk_cache"  not in st.session_state: st.session_state.risk_cache  = {}
+if "risk_cache"  not in st.session_state: st.session_state.risk_cache  = {}  # {ticker: [risks]}
 if "risk_ignore" not in st.session_state: st.session_state.risk_ignore = []
 
 # ────────────────────────── SIDEBAR – SETTINGS ───────────────────────
@@ -375,27 +375,33 @@ portfolio_stocks = st.session_state.portfolio
 # ───────────────────────────── PORTFOLIO UI ──────────────────────────
 st.markdown("### Position sizes Editable")
 
-if "alloc_df" not in st.session_state:
-    tickers = st.session_state.portfolio
-    st.session_state.alloc_df = pd.DataFrame({
-        "Ticker": tickers,
-        "Amount ($)": [10_000] * len(tickers),
-        "Stop-Loss ($)": [None] * len(tickers)
-    })
+uploaded_file = st.file_uploader("Upload your portfolio (CSV)", type=["csv"])
+if uploaded_file:
+    # Read the uploaded CSV
+    df = pd.read_csv(uploaded_file)
+    required_cols = ["Ticker", "Amount ($)"]
+    if not all(col in df.columns for col in required_cols):
+        st.error("CSV must contain 'Ticker' and 'Amount ($)' columns.")
+    else:
+        # Ensure 'Stop-Loss ($)' is present, default to None if missing
+        df["Stop-Loss ($)"] = df.get("Stop-Loss ($)", [None] * len(df))
+        st.session_state.alloc_df = df[["Ticker", "Amount ($)", "Stop-Loss ($)"]]
+        st.session_state.portfolio = df["Ticker"].tolist()
+        st.session_state.portfolio_alloc = dict(zip(df["Ticker"], df["Amount ($)"]))
+else:
+    if "alloc_df" not in st.session_state:
+        st.session_state.alloc_df = pd.DataFrame({
+            "Ticker": ["AAPL", "MSFT"],
+            "Amount ($)": [10000, 10000],
+            "Stop-Loss ($)": [None, None]
+        })
+    st.session_state.alloc_df = (
+        st.session_state.alloc_df
+        .query("Ticker in @st.session_state.portfolio")
+        .sort_values("Amount ($)", ascending=False, ignore_index=True)
+    )
 
-st.session_state.alloc_df = (
-    st.session_state.alloc_df
-      .query("Ticker in @st.session_state.portfolio")
-      .sort_values("Amount ($)", ascending=False, ignore_index=True)
-)
-
-clean_df = (
-    st.session_state.alloc_df
-      .dropna(subset=["Ticker"])
-      .query("Ticker != ''")
-      .drop_duplicates(subset=["Ticker"])
-      .sort_values("Amount ($)", ascending=False, ignore_index=True)
-)
+clean_df = st.session_state.alloc_df.copy()
 
 tickers = clean_df["Ticker"].tolist()
 prices_df = fetch_prices(tickers, period="2d")
@@ -409,22 +415,15 @@ else:
     clean_df["Price"] = 0.0
     clean_df["Δ 1d %"] = 0.0
 
-editor_df = st.data_editor(
-    clean_df,
-    disabled={"Price": True, "Δ 1d %": True},
-    num_rows="dynamic",
-    use_container_width=True,
-    key="alloc_editor",
-    hide_index=True,
-)
+st.dataframe(clean_df, use_container_width=True)
 
 st.session_state.stop_loss_map = dict(
-    zip(editor_df["Ticker"], editor_df["Stop-Loss ($)"])
+    zip(clean_df["Ticker"], clean_df["Stop-Loss ($)"])
 )
-st.session_state.alloc_df = editor_df
-st.session_state.portfolio = editor_df["Ticker"].tolist()
+st.session_state.alloc_df = clean_df
+st.session_state.portfolio = clean_df["Ticker"].tolist()
 st.session_state.portfolio_alloc = dict(
-    zip(editor_df["Ticker"], editor_df["Amount ($)"])
+    zip(clean_df["Ticker"], clean_df["Amount ($)"])
 )
 
 ticker_df = pd.DataFrame({
@@ -647,7 +646,7 @@ if suggest_clicked:
 
     df = pd.DataFrame(records)
 
-    user_df = editor_df.copy()
+    user_df = clean_df.copy()
     user_df["Position"] = "Long"
     user_df["Source"] = "User portfolio"
     user_df["% of Portfolio"] = (user_df["Amount ($)"] / user_df["Amount ($)"].sum() * 100).round(2)
