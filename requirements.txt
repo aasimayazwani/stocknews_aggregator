@@ -7,6 +7,5 @@ plotly
 streamlit==1.35.0 
 pandas==2.2.2 
 plotly-express==0.4.1 
-yfinance==0.2.41 
 requests==2.32.3 
 langgraph==0.1.3
