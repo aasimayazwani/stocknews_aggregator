@@ -70,13 +70,10 @@ with st.sidebar.expander("📌 Investor Profile", expanded=False):
     )
 
 with st.sidebar.expander("🧮 Investment Settings", expanded=True):
-    pass  # Removed Focus stock selectbox
+    pass  # Removed Focus stock and other settings
 
 with st.sidebar.expander("⚙️ Strategy Settings", expanded=False):
-    st.slider("🎯 Beta match band", 0.5, 2.0, (1.15, 1.50), step=0.01, key="beta_band")
-    st.slider("🔻 Stop-loss for shorts (%)", 1, 20, 10, key="stop_loss")
-    st.slider("💰 Total hedge budget (% of capital)", 5, 25, 10, key="total_budget")
-    st.slider("📉 Max per single hedge (% of capital)", 1, 10, 5, key="max_hedge")
+    pass  # Removed sliders for beta band, stop-loss, total budget, and max hedge
 
 with st.sidebar.expander("🧹 Session Tools", expanded=False):
     with st.sidebar.expander("🧠 Previous Strategies", expanded=True):
@@ -108,10 +105,6 @@ experience_level   = st.session_state.get("experience_level", "Expert")
 explanation_pref   = st.session_state.get("explanation_pref", "Just the strategy")
 avoid_overlap      = st.session_state.get("avoid_overlap", True)
 allowed_instruments = st.session_state.get("allowed_instruments", ["Put Options", "Collar Strategy"])
-beta_rng           = st.session_state.get("beta_band", (1.15, 1.50))
-stop_loss          = st.session_state.get("stop_loss", 10)
-hedge_budget_pct   = st.session_state.get("total_budget", 10)
-single_hedge_pct   = st.session_state.get("max_hedge", 5)
 horizon            = st.session_state.get("time_horizon", 6)
 portfolio          = st.session_state.get("portfolio", ["AAPL", "MSFT"])  # Use all portfolio stocks
 
@@ -516,8 +509,35 @@ if suggest_clicked:
         f"{ticker}: ${float(sl):.2f}" for ticker, sl in st.session_state.stop_loss_map.items() if pd.notnull(sl)
     ) or "None"
 
-    hedge_budget_pct   = st.session_state.get("total_budget", 10)
-    single_hedge_pct   = st.session_state.get("max_hedge", 5)
+    # Initial prompt to determine strategy settings
+    settings_prompt = textwrap.dedent(f"""
+    You are a **Hedging Strategist**. Based on the portfolio and risks, suggest optimal values for:
+    - Beta match band (range, e.g., 1.10–1.40)
+    - Stop-loss for shorts (%)
+    - Total hedge budget (% of capital)
+    - Max per single hedge (% of capital)
+
+    Portfolio: {', '.join(portfolio)}
+    Allocation: {alloc_str}
+    Risks: {risk_string}
+    Capital: ${total_capital:,.0f}
+    Horizon: {horizon} mo
+
+    Return only the values in this format:
+    Beta match band: X.XX–X.XX
+    Stop-loss: X%
+    Total hedge budget: X%
+    Max per single hedge: X%
+    """).strip()
+
+    with st.spinner("Determining strategy settings…"):
+        settings_response = ask_openai(model, "You are a precise financial strategist.", settings_prompt)
+        settings_lines = settings_response.splitlines()
+        beta_rng = tuple(float(x) for x in re.search(r"Beta match band: (\d+\.\d+)–(\d+\.\d+)", settings_lines[0]).groups())
+        stop_loss = float(re.search(r"Stop-loss: (\d+\.?\d*)%", settings_lines[1]).group(1))
+        hedge_budget_pct = float(re.search(r"Total hedge budget: (\d+\.?\d*)%", settings_lines[2]).group(1))
+        single_hedge_pct = float(re.search(r"Max per single hedge: (\d+\.?\d*)%", settings_lines[3]).group(1))
+
     max_hedge_notional = total_capital * hedge_budget_pct / 100
 
     avoid_note = ""
@@ -529,7 +549,7 @@ if suggest_clicked:
         )
 
     prompt = textwrap.dedent(f"""
-    👋  You are a **Hedging Strategist** helping investors protect capital while keeping portfolio beta between **{beta_rng[0]:.2f} – {beta_rng[1]:.2f}**.
+    👋  You are a **Hedging Strategist** helping investors protect capital while keeping portfolio beta between **{beta_rng[0]:.2f}–{beta_rng[1]:.2f}**.
 
     ─────────────────────────────────
     🔑 **Key Instructions**
