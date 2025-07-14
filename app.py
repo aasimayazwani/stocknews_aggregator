@@ -9,6 +9,7 @@ import yfinance as yf
 from config import DEFAULT_MODEL          # local module
 from openai_client import ask_openai      # wrapper around OpenAI API
 from stock_utils import get_stock_summary # your own helper
+
 # ────────────────────────────────── THEME ─────────────────────────────────
 st.set_page_config(page_title="Hedge Strategy Chatbot", layout="centered")
 
@@ -68,10 +69,9 @@ with st.sidebar.expander("📌 Investor Profile", expanded=False):
         key="allowed_instruments"
     )
 
-
-
 with st.sidebar.expander("🧮 Investment Settings", expanded=True):
-    st.selectbox("Focus stock", options=["AAPL", "MSFT", "TSLA"], key="focus_stock")
+    pass  # Removed Focus stock selectbox
+
 with st.sidebar.expander("⚙️ Strategy Settings", expanded=False):
     st.slider("🎯 Beta match band", 0.5, 2.0, (1.15, 1.50), step=0.01, key="beta_band")
     st.slider("🔻 Stop-loss for shorts (%)", 1, 20, 10, key="stop_loss")
@@ -91,11 +91,7 @@ with st.sidebar.expander("🧹 Session Tools", expanded=False):
                         f"**Capital**: ${run['capital']:,.0f}  \n"
                         f"**Beta Band**: {run['beta_band'][0]}–{run['beta_band'][1]}"
                     )
-
-                    # Display strategy sizing table
                     st.dataframe(run["strategy_df"], use_container_width=True)
-
-                    # Display rationale (markdown-formatted strategy)
                     st.markdown("**Strategy Rationale**")
                     st.markdown(run["rationale_md"])
 
@@ -106,12 +102,10 @@ with st.sidebar.expander("🧹 Session Tools", expanded=False):
         st.session_state.chat_history = []
     if st.button("🗑️ Clear Strategy History"):
         st.session_state.strategy_history = []
-    
 
 # 🔧 Extract sidebar values into variables
 experience_level   = st.session_state.get("experience_level", "Expert")
-explanation_pref   = st.session_state.get("explanation_pref", "Both")
-focus_stock        = st.session_state.get("focus_stock", "AAPL")
+explanation_pref   = st.session_state.get("explanation_pref", "Just the strategy")
 avoid_overlap      = st.session_state.get("avoid_overlap", True)
 allowed_instruments = st.session_state.get("allowed_instruments", ["Put Options", "Collar Strategy"])
 beta_rng           = st.session_state.get("beta_band", (1.15, 1.50))
@@ -119,9 +113,7 @@ stop_loss          = st.session_state.get("stop_loss", 10)
 hedge_budget_pct   = st.session_state.get("total_budget", 10)
 single_hedge_pct   = st.session_state.get("max_hedge", 5)
 horizon            = st.session_state.get("time_horizon", 6)
-primary            = focus_stock  # Rename for clarity
-model              = DEFAULT_MODEL  # You already imported this
-
+portfolio          = st.session_state.get("portfolio", ["AAPL", "MSFT"])  # Use all portfolio stocks
 
 st.markdown("""
 <style>
@@ -268,11 +260,6 @@ def clean_md(md: str) -> str:
     return md.replace("*", "").replace("_", "")
 
 def render_rationale(df: pd.DataFrame) -> None:
-    """
-    Show a nicely-formatted card for every hedge instrument
-    in df.  Assumes columns: Ticker, Position, Amount ($),
-    Rationale, Source   (anything missing is handled gracefully).
-    """
     if df.empty:
         st.info("No hedge rationale to show.")
         return
@@ -298,13 +285,11 @@ def render_rationale(df: pd.DataFrame) -> None:
             f"<span style='color:#22d3ee'>${amt:,.0f}</span><br>{rat}"
         )
 
-        # add link if it looks like a URL
         if re.match(r'^https?://', src):
-            card += f"<br><a href='{src}' target='_blank' style='color:#60a5fa;'>Source&nbsp;↗</a>"
+            card += f"<br><a href='{src}' target='_blank' style='color:#60a5fa;'>Source ↗</a>"
 
         card += "</div>"
         st.markdown(card, unsafe_allow_html=True)
-
 
 def fallback_ticker_lookup(name: str, model_name: str = "gpt-4.1-mini") -> str:
     prompt = f"What is the stock ticker symbol for the publicly traded company '{name}'?"
@@ -313,105 +298,65 @@ def fallback_ticker_lookup(name: str, model_name: str = "gpt-4.1-mini") -> str:
         system_prompt="You are a financial assistant that returns only the correct stock ticker symbol.",
         user_prompt=prompt,
     )
-
-    import re
     match = re.search(r"\b[A-Z]{2,5}\b", raw.strip())
     return match.group(0) if match else ""
-
 
 @st.cache_data(ttl=3600)
 def search_tickers(query: str) -> List[str]:
     from urllib.parse import quote
     query_clean = query.strip().lower()
     url = f"https://query1.finance.yahoo.com/v1/finance/search?q={quote(query_clean)}"
-
     try:
         resp = requests.get(url, timeout=5)
         if resp.status_code != 200:
             return []
-
         results = resp.json().get("quotes", [])
-        tickers = []
-        for r in results:
-            symbol = r.get("symbol", "")
-            name = r.get("shortname") or r.get("longname") or ""
-            if symbol and name:
-                tickers.append(f"{symbol} – {name}")
-
-        # Fallback: use GPT if nothing came back
+        tickers = [f"{r.get('symbol', '')} – {r.get('shortname') or r.get('longname') or ''}" for r in results if r.get('symbol') and (r.get('shortname') or r.get('longname'))]
         if not tickers and len(query_clean) >= 3:
             fallback = fallback_ticker_lookup(query_clean)
             if fallback:
                 tickers.append(f"{fallback} – (GPT suggested)")
-
         return tickers
     except Exception:
         return []
-
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_prices(tickers: List[str], period="2d"):
     df = yf.download(tickers, period=period, progress=False)["Close"]
     return df.dropna(axis=1, how="all")
 
-
-
 @st.cache_data(ttl=900, show_spinner=False)
 def web_risk_scan(ticker: str):
-    """
-    Pulls analyst-related headlines for a given stock using NewsAPI.
-    Deduplicates results and filters for risk-related language or known analysts.
-    """
     api_key = st.secrets.get("NEWSAPI_KEY") or os.getenv("NEWSAPI_KEY")
     if not api_key:
         return [("⚠️ No NEWSAPI_KEY found. Please add it to .streamlit/secrets.toml", "#")]
-
-    # Build query for ticker + analyst-related terms
     query = f'"{ticker}" AND (analyst OR downgrade OR rating OR earnings OR revise OR cut OR risk)'
     url = "https://newsapi.org/v2/everything"
-    params = {
-        "q": query,
-        "language": "en",
-        "sortBy": "publishedAt",
-        "pageSize": 15,
-        "apiKey": api_key
-    }
-
+    params = {"q": query, "language": "en", "sortBy": "publishedAt", "pageSize": 15, "apiKey": api_key}
     try:
         response = requests.get(url, params=params)
         response.raise_for_status()
         articles = response.json().get("articles", [])
     except Exception as e:
         return [(f"❌ Error fetching headlines: {str(e)}", "#")]
-
     known_analysts = ["Dan Ives", "Katy Huberty", "Gene Munster", "Mark Mahaney"]
     seen_titles = set()
     risks = []
-
     for article in articles:
         title = article.get("title", "")
         url = article.get("url", "#")
-
         if not title or title in seen_titles:
-            continue  # Skip empty or duplicate titles
-
-        # Check for risk-related or analyst headlines
-        if any(keyword in title.lower() for keyword in [
-            "downgrade", "risk", "cut", "concern", "slashed", "fall", "caution", "bearish", "revised"
-        ]):
+            continue
+        if any(keyword in title.lower() for keyword in ["downgrade", "risk", "cut", "concern", "slashed", "fall", "caution", "bearish", "revised"]):
             risks.append((title, url))
             seen_titles.add(title)
-
         elif any(analyst in title for analyst in known_analysts):
             risks.append((f"📊 Analyst: {title}", url))
             seen_titles.add(title)
-
         if len(risks) >= 5:
             break
-
     if not risks:
         return [("No relevant analyst headlines found for " + ticker, "#")]
-
     return risks
 
 # ─────────────────────────────── STATE ────────────────────────────────
@@ -422,7 +367,6 @@ if "risk_cache"  not in st.session_state: st.session_state.risk_cache  = {}
 if "risk_ignore" not in st.session_state: st.session_state.risk_ignore = []
 
 # ────────────────────────── SIDEBAR – SETTINGS ───────────────────────
-# 🛡️ Hedge instrument defaults by experience
 experience_to_default = {
     "Beginner": ["Inverse ETFs", "Commodities"],
     "Intermediate": ["Put Options", "Inverse ETFs", "Commodities"],
@@ -430,36 +374,28 @@ experience_to_default = {
 }
 
 avoid_duplicate_hedges = st.session_state.get("avoid_overlap", True)
-# Store in session state
 st.session_state.avoid_dup_hedges = avoid_duplicate_hedges
 
-# 🎯 basket computation moved below
-others  = [t for t in st.session_state.portfolio if t != primary]
-basket  = [primary] + others
+# 🎯 Use all portfolio stocks for hedging
+portfolio_stocks = st.session_state.portfolio
 
 # ───────────────────────────── PORTFOLIO UI ──────────────────────────
-# ⬇️ NEW ticker search & autocomplete with live API results
-
-# ─────────────────── 💰 POSITION-SIZE EDITOR ────────────────────
 st.markdown("### Position sizes Editable")
 
-# 1. Boot-strap a persistent table in session-state
 if "alloc_df" not in st.session_state:
     tickers = st.session_state.portfolio
     st.session_state.alloc_df = pd.DataFrame({
-    "Ticker": tickers,
-    "Amount ($)": [10_000] * len(tickers),
-    "Stop-Loss ($)": [None] * len(tickers)  # New column
-})
+        "Ticker": tickers,
+        "Amount ($)": [10_000] * len(tickers),
+        "Stop-Loss ($)": [None] * len(tickers)
+    })
 
-# 2. Keep only valid rows
 st.session_state.alloc_df = (
     st.session_state.alloc_df
       .query("Ticker in @st.session_state.portfolio")
       .sort_values("Amount ($)", ascending=False, ignore_index=True)
 )
 
-# 3–4. Clean and validate input from session state
 clean_df = (
     st.session_state.alloc_df
       .dropna(subset=["Ticker"])
@@ -468,7 +404,6 @@ clean_df = (
       .sort_values("Amount ($)", ascending=False, ignore_index=True)
 )
 
-# 5. Add real-time price and % change
 tickers = clean_df["Ticker"].tolist()
 prices_df = fetch_prices(tickers, period="2d")
 
@@ -481,17 +416,15 @@ else:
     clean_df["Price"] = 0.0
     clean_df["Δ 1d %"] = 0.0
 
-# 6. Show a single data editor (with price columns read-only)
 editor_df = st.data_editor(
     clean_df,
-    disabled={"Price": True, "Δ 1d %": True},  # Stop-Loss is editable
+    disabled={"Price": True, "Δ 1d %": True},
     num_rows="dynamic",
     use_container_width=True,
     key="alloc_editor",
     hide_index=True,
 )
 
-# 7. Persist edits back to session state
 st.session_state.stop_loss_map = dict(
     zip(editor_df["Ticker"], editor_df["Stop-Loss ($)"])
 )
@@ -501,7 +434,6 @@ st.session_state.portfolio_alloc = dict(
     zip(editor_df["Ticker"], editor_df["Amount ($)"])
 )
 
-# 8. Create pie data (used conditionally later)
 ticker_df = pd.DataFrame({
     "Ticker": list(st.session_state.portfolio_alloc.keys()),
     "Amount": list(st.session_state.portfolio_alloc.values())
@@ -513,37 +445,38 @@ ticker_df["Label"] = (
     ticker_df["Amount"].round(0).astype(int).astype(str) + ")"
 )
 
-# 10. Save final list
 portfolio = st.session_state.portfolio
 
 with st.sidebar.expander("🔍 Key headline risks", expanded=True):
-    if primary not in st.session_state.risk_cache:
-        with st.spinner("Scanning web…"):
-            st.session_state.risk_cache[primary] = web_risk_scan(primary)
+    for ticker in portfolio:
+        if ticker not in st.session_state.risk_cache:
+            with st.spinner(f"Scanning web for {ticker}…"):
+                st.session_state.risk_cache[ticker] = web_risk_scan(ticker)
 
-    risk_tuples = st.session_state.risk_cache[primary]
-    risk_titles = [t[0] for t in risk_tuples]
-    risk_links = {title: url for title, url in risk_tuples}
+        risk_tuples = st.session_state.risk_cache[ticker]
+        risk_titles = [t[0] for t in risk_tuples]
+        risk_links = {title: url for title, url in risk_tuples}
 
-    selected_risks = []
+        st.markdown(f"### Risks for {ticker}")
+        selected_risks = []
 
-    for i, risk in enumerate(risk_titles):
-        key = f"risk_{i}"
-        default = True if key not in st.session_state else st.session_state[key]
+        for i, risk in enumerate(risk_titles):
+            key = f"risk_{ticker}_{i}"
+            default = True if key not in st.session_state else st.session_state[key]
 
-        cols = st.columns([0.1, 0.8, 0.1])
-        with cols[0]:
-            is_selected = st.checkbox("", key=key, value=default)
-        with cols[1]:
-            st.markdown(risk)
-        with cols[2]:
-            st.markdown(f"[ℹ️]({risk_links.get(risk, '#')})")
+            cols = st.columns([0.1, 0.8, 0.1])
+            with cols[0]:
+                is_selected = st.checkbox("", key=key, value=default)
+            with cols[1]:
+                st.markdown(risk)
+            with cols[2]:
+                st.markdown(f"[ℹ️]({risk_links.get(risk, '#')})")
 
-        if is_selected:
-            selected_risks.append(risk)
+            if is_selected:
+                selected_risks.append(risk)
 
-    st.session_state.selected_risks = selected_risks
-    st.session_state.risk_ignore = [r for r in risk_titles if r not in selected_risks]
+        st.session_state.selected_risks = selected_risks
+        st.session_state.risk_ignore = [r for r in risk_titles if r not in selected_risks]
 
 experience_to_default = {
     "Beginner": ["Inverse ETFs", "Commodities"],
@@ -553,17 +486,13 @@ experience_to_default = {
 
 default_instruments = experience_to_default.get(st.session_state.experience_level, [])
 
-# Sidebar: Hedge instruments based on experience
-
 if "strategy_history" not in st.session_state:
     st.session_state.strategy_history = []
 
-# Strategy generation & rendering
 if suggest_clicked:
-    # 1. Collect context values
     ignored = "; ".join(st.session_state.risk_ignore) or "None"
     total_capital = sum(st.session_state.portfolio_alloc.values())
-    risk_string = ", ".join(risk_titles) or "None"
+    risk_string = ", ".join(r for ticker in portfolio for r in st.session_state.risk_cache.get(ticker, [])[0]) or "None"
     alloc_str = "; ".join(f"{k}: ${v:,.0f}" for k, v in st.session_state.portfolio_alloc.items()) or "None"
 
     exp_pref = st.session_state.explanation_pref
@@ -587,8 +516,8 @@ if suggest_clicked:
         f"{ticker}: ${float(sl):.2f}" for ticker, sl in st.session_state.stop_loss_map.items() if pd.notnull(sl)
     ) or "None"
 
-    hedge_budget_pct   = st.session_state.get("total_budget", 10)     # ← from sidebar slider
-    single_hedge_pct   = st.session_state.get("max_hedge", 5)         # ← from sidebar slider
+    hedge_budget_pct   = st.session_state.get("total_budget", 10)
+    single_hedge_pct   = st.session_state.get("max_hedge", 5)
     max_hedge_notional = total_capital * hedge_budget_pct / 100
 
     avoid_note = ""
@@ -599,7 +528,6 @@ if suggest_clicked:
             "- ✅ Prefer diversifiers (sector ETFs, index futures, inverse ETFs, FX, commodities).\n"
         )
 
-    # Build final prompt
     prompt = textwrap.dedent(f"""
     👋  You are a **Hedging Strategist** helping investors protect capital while keeping portfolio beta between **{beta_rng[0]:.2f} – {beta_rng[1]:.2f}**.
 
@@ -607,10 +535,7 @@ if suggest_clicked:
     🔑 **Key Instructions**
 
     1. **Hedging Scope**  
-    • Primary target: **{primary}**  
-    • Scope selected by user: **{st.session_state.hedge_scope}**  
-        – *Focus Stock Only* → hedge **{primary}** exclusively.  
-        – *Entire Portfolio* → hedge all positions shown below.
+    • Hedge all stocks in the portfolio: **{', '.join(portfolio)}**.
 
     2. **Allowed Hedge Types**  
     {', '.join(st.session_state.allowed_instruments)}  
@@ -669,36 +594,25 @@ if suggest_clicked:
     Return the answer in plain Markdown, no HTML or code fences.
     """).strip()
 
-
-    # 2.  Call OpenAI -----------------------------------------------------------
     with st.spinner("Calling ChatGPT…"):
         raw_md = ask_openai(model, "You are a precise, citation-rich strategist.", prompt)
 
     plan_md = raw_md
 
-    # Extract footnotes once: [1] https://...
     footnotes = dict(re.findall(r"\[(\d+)\]\s+(https?://[^\s]+)", plan_md))
-
-    # Replace [1], [2], etc. with markdown-embedded superscript links
     superscripts_map = "⁰¹²³⁴⁵⁶⁷⁸⁹"
     for ref_id, url in footnotes.items():
         superscript = "".join(superscripts_map[int(d)] for d in ref_id)
         plan_md = plan_md.replace(f"[{ref_id}]", f"[🔗{superscript}]({url})")
-
-    # Remove raw footnote lines like: [1] https://...
     plan_md = re.sub(r"^\[\d+\]\s+https?://[^\s]+", "", plan_md, flags=re.MULTILINE)
 
-    # Define hedge_lines for downstream use
     lines = plan_md.splitlines()
-    hedge_lines = [line for line in lines if re.match(r"^\d+\.\s+\*\*.+\*\*", line)]
+    hedge_lines = [line for line in lines if re.match(r"^\d+\.\s+(?:\*\*)?(.+?)(?:\*\*)?\s+—\s+", line)]
 
-    # Display strategy
     st.subheader("📌 Suggested strategy")
-
 
     records = []
     for line in hedge_lines:
-        #match = re.match(r"^(\d+)\.\s+\*\*(.+?)\*\*\s+—\s+(.*?)\s+\[(\d+)\]", line)
         match = re.match(r"^(\d+)\.\s+(?:\*\*)?(.+?)(?:\*\*)?\s+—\s+(.*?)\s+\[(\d+)\]", line)
         if match:
             _, ticker, rationale, ref_id = match.groups()
@@ -713,7 +627,6 @@ if suggest_clicked:
 
     df = pd.DataFrame(records)
 
-    # 📌 User table (from editor)
     user_df = editor_df.copy()
     user_df["Position"] = "Long"
     user_df["Source"] = "User portfolio"
@@ -721,7 +634,6 @@ if suggest_clicked:
     user_df["Rationale"] = "—"
     user_df["Ticker"] = user_df["Ticker"].astype(str)
 
-    # 🧮 Optional: combine user + hedge tables
     df["% of Portfolio"] = 0
     df["Price"] = "_n/a_"
     df["Δ 1d %"] = "_n/a_"
@@ -732,13 +644,10 @@ if suggest_clicked:
     user_df = user_df[final_cols]
     missing_cols = [col for col in final_cols if col not in df.columns]
     for col in missing_cols:
-        df[col] = ""  # fill with empty strings
-
-    # Now safe to reorder
+        df[col] = ""
     df = df[final_cols]
     combined_df = pd.concat([user_df, df], ignore_index=True)
 
-    # ✅ Store in session state
     st.session_state.user_df = user_df
     st.session_state.strategy_df = df
     st.session_state.rationale_md = plan_md
@@ -751,21 +660,18 @@ if suggest_clicked:
         "rationale_md": plan_md,
     })
 
-    # 📊 Post-hedge allocation (optional chart)
     st.dataframe(combined_df.drop(columns=["Rationale"]), use_container_width=True)
 
-    # ✅ Markdown rationale display (not the table)
     st.markdown("### 📌 Hedge Strategy Rationale")
     st.markdown(plan_md)
 
-# ───────────────────────────── QUICK CHAT ────────────────────────────
 st.divider()
 st.markdown("### 💬  Quick chat")
 for role, msg in st.session_state.history:
     st.chat_message(role).write(msg)
 
 if q := st.chat_input("Ask anything…"):
-    ctx = f"User portfolio: {', '.join(portfolio)}. Focus: {primary}."
+    ctx = f"User portfolio: {', '.join(portfolio)}. Focus: All stocks."
     st.session_state.history.append(("user", q))
     ans = ask_openai(model, "You are a helpful market analyst.", ctx + "\n\n" + q)
     st.session_state.history.append(("assistant", ans))
