@@ -4,13 +4,14 @@ from typing import List, Dict, Any
 import os
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import yfinance as yf
 from config import DEFAULT_MODEL          # local module
 from openai_client import ask_openai      # wrapper around OpenAI API
 from stock_utils import get_stock_summary # your own helper
 from langgraph.graph import Graph, END
 from langgraph.agent import Agent, Tool
+from langgraph.tool import tool           # For tool decoration
+import datetime                           # For timestamps
 
 # ────────────────────────────────── THEME ─────────────────────────────────
 st.set_page_config(page_title="Hedge Strategy Chatbot", layout="centered")
