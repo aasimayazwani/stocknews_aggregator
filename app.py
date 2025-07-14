@@ -107,6 +107,7 @@ avoid_overlap      = st.session_state.get("avoid_overlap", True)
 allowed_instruments = st.session_state.get("allowed_instruments", ["Put Options", "Collar Strategy"])
 horizon            = st.session_state.get("time_horizon", 6)
 portfolio          = st.session_state.get("portfolio", ["AAPL", "MSFT"])  # Use all portfolio stocks
+model = DEFAULT_MODEL  # Define model variable using the imported DEFAULT_MODEL
 
 st.markdown("""
 <style>
@@ -244,8 +245,7 @@ if "history"     not in st.session_state: st.session_state.history     = []
 if "portfolio"   not in st.session_state: st.session_state.portfolio   = ["AAPL", "MSFT"]
 if "outlook_md"  not in st.session_state: st.session_state.outlook_md  = None
 if "risk_cache"  not in st.session_state: st.session_state.risk_cache  = {}  # {ticker: [risks]}
-if "risk_ignore" not in st.session_state: st.session_state.risk_ignore = []  # selected exclusions
-if "selected_risks" not in st.session_state: st.session_state.selected_risks = []
+if "risk_ignore" not in st.session_state: st.session_state.risk_ignore = []
 
 # ──────────────────────────── HELPERS ────────────────────────────────
 def clean_md(md: str) -> str:
