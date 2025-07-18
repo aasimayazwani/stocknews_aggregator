@@ -18,7 +18,7 @@ st.set_page_config(page_title="Hedge Strategy Chatbot", layout="centered")
 with st.sidebar.expander("📌 Investor Profile", expanded=False):
     # Experience
     experience = st.selectbox(
-        label="",
+        label="Investor experience", 
         options=["Beginner", "Intermediate", "Expert"],
         index=["Beginner", "Intermediate", "Expert"].index(st.session_state.get("experience_level", "Expert")),
         format_func=lambda x: f"Experience: {x}",
@@ -27,7 +27,7 @@ with st.sidebar.expander("📌 Investor Profile", expanded=False):
 
     # Detail level
     detail_level = st.selectbox(
-        label="",
+        label="Explanation detail preference",
         options=["Just the strategy", "Explain the reasoning", "Both"],
         index=["Just the strategy", "Explain the reasoning", "Both"].index(st.session_state.get("explanation_pref", "Just the strategy")),
         format_func=lambda x: f"Detail level: {x}",
@@ -396,7 +396,7 @@ def search_tickers(query: str) -> List[str]:
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_prices(tickers: List[str], period="2d"):
-    df = yf.download(tickers, period=period, progress=False)["Close"]
+    df = yf.download(tickers, period=period, progress=False, auto_adjust=True)["Close"]
     return df.dropna(axis=1, how="all")
 
 @st.cache_data(ttl=900, show_spinner=False)
@@ -556,7 +556,12 @@ with st.sidebar.expander("🔍 Key headline risks", expanded=True):
 
             cols = st.columns([0.1, 0.8, 0.1])
             with cols[0]:
-                is_selected = st.checkbox("", key=key, value=default)
+                is_selected = st.checkbox(
+                    label=f"Select: {risk}",   # ← FIXED
+                    key=key,
+                    value=default,
+                    label_visibility="collapsed"  # Optional if you want to hide visually
+                )
             with cols[1]:
                 st.markdown(risk)
             with cols[2]:
@@ -700,7 +705,10 @@ if suggest_clicked:
             system_prompt=SYSTEM_JSON,
             user_prompt=USER_JSON,
         )
-
+        if not raw_json.strip().startswith("{"):
+            st.error("❌ LLM did not return valid JSON.")
+            st.code(raw_json.strip() or "[Empty response]", language="text")
+            st.stop()
     # ───────────────────── parse & validate LLM result ─────────────────────
     try:
         data = json.loads(raw_json)
