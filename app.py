@@ -292,8 +292,9 @@ def render_strategy_cards(df: pd.DataFrame) -> None:
                 <div style="margin-top: 8px;">
                     <b>Risk Reduction:</b> {row.risk_reduction_pct}% &nbsp;&nbsp;
                     <b>Cost:</b> {row.get("aggregate_cost_pct", 0):.1f}% of capital &nbsp;&nbsp;
-                    <b>Horizon:</b> {row.time_horizon_months} months
+                    <b>Horizon:</b> {row.get("horizon_months", "—")} months
                 </div>
+
 
                 <details style="margin-top: 12px; color: #e2e8f0;">
                     <summary style="cursor: pointer;">📖 View Rationale & Trade-offs</summary>
