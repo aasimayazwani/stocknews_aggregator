@@ -427,20 +427,36 @@ portfolio_stocks = st.session_state.portfolio
 # ───────────────────────────── PORTFOLIO UI ──────────────────────────
 st.markdown("### Position sizes Editable")
 
+from io import StringIO
+
 uploaded_file = st.file_uploader("Upload your portfolio (CSV)", type=["csv"])
 if uploaded_file:
-    # Read the uploaded CSV
-    df = pd.read_csv(uploaded_file)
+    try:
+        # Decode and read safely using the Python engine
+        content = uploaded_file.getvalue().decode("utf-8", errors="ignore")
+        df = pd.read_csv(StringIO(content), engine="python", on_bad_lines="warn")
+    except Exception as e:
+        st.error("❌ Error reading CSV. Please check for missing quotes, commas, or formatting issues.")
+        st.exception(e)
+        st.stop()
+
     required_cols = ["Ticker", "Amount ($)"]
     if not all(col in df.columns for col in required_cols):
-        st.error("CSV must contain 'Ticker' and 'Amount ($)' columns.")
-    else:
-        # Ensure 'Stop-Loss ($)' is present, default to None if missing
-        df["Stop-Loss ($)"] = df.get("Stop-Loss ($)", [None] * len(df))
-        st.session_state.alloc_df = df[["Ticker", "Amount ($)", "Stop-Loss ($)"]]
-        st.session_state.portfolio = df["Ticker"].tolist()
-        st.session_state.portfolio_alloc = dict(zip(df["Ticker"], df["Amount ($)"]))
+        st.error("CSV must contain at least 'Ticker' and 'Amount ($)' columns.")
+        st.stop()
+
+    # Add Stop-Loss column if missing
+    if "Stop-Loss ($)" not in df.columns:
+        df["Stop-Loss ($)"] = None
+
+    # Save cleaned DataFrame to session
+    df["Ticker"] = df["Ticker"].astype(str).str.upper()
+    st.session_state.alloc_df = df[["Ticker", "Amount ($)", "Stop-Loss ($)"]]
+    st.session_state.portfolio = df["Ticker"].tolist()
+    st.session_state.portfolio_alloc = dict(zip(df["Ticker"], df["Amount ($)"]))
+
 else:
+    # Fallback default portfolio
     if "alloc_df" not in st.session_state:
         st.session_state.alloc_df = pd.DataFrame({
             "Ticker": ["AAPL", "MSFT"],
@@ -453,9 +469,10 @@ else:
         .sort_values("Amount ($)", ascending=False, ignore_index=True)
     )
 
+# Clone the cleaned DataFrame for UI display
 clean_df = st.session_state.alloc_df.copy()
-
 tickers = clean_df["Ticker"].tolist()
+
 prices_df = fetch_prices(tickers, period="2d")
 
 if not prices_df.empty:
