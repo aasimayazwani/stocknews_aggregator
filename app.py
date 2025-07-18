@@ -264,41 +264,47 @@ st.session_state.strategy_history.append({
 
 # ──────────────────────────── HELPERS ────────────────────────────────
 def render_strategy_cards(df: pd.DataFrame) -> None:
-    """
-    Render each strategy as a collapsible card.  Clicking the header toggles
-    an expander that shows the full description / justification.
-    """
     if df.empty:
         st.info("LLM returned no strategies.")
         return
 
     for i, row in df.iterrows():
-        # ── closed-state header ─────────────────────────────────────────
-        header_cols = st.columns([6, 3, 1])
-        header_cols[0].markdown(f"**{row.name}**")
-        header_cols[1].metric(
-            "Risk ↓",
-            f"{row.risk_reduction_pct} %",
-            help="Percent reduction in portfolio VaR"
-        )
-        header_cols[2].markdown(
-            f"<span style='background:#33415566;padding:4px 8px;"
-            "border-radius:6px;font-size:11px'>Variant {row.variant}</span>",
-            unsafe_allow_html=True,
+        is_selected = (
+            st.session_state.chosen_strategy
+            and row.name == st.session_state.chosen_strategy.get("name")
         )
 
-        # ── body ────────────────────────────────────────────────────────
-        with st.expander("View rationale & details", expanded=False):
-            st.markdown(f"**Rationale:** {row.rationale}")
+        border_color = "#10b981" if is_selected else "#334155"
+        card = st.container()
+        with card:
             st.markdown(
-                f"*Cost:* **{row.cost_pct_of_portfolio:.1f}%** of capital &nbsp;|&nbsp; "
-                f"*Horizon:* **{row.time_horizon_months} mo**"
+                f"<div style='border:1px solid {border_color}; border-radius:10px; padding:12px;'>",
+                unsafe_allow_html=True
+            )
+            cols = st.columns([6, 2, 2])
+            cols[0].markdown(f"### {row.name}")
+            cols[1].metric("Risk ↓", f"{row.risk_reduction_pct} %")
+            cols[2].markdown(
+                f"<span style='background:#33415566;padding:4px 8px;"
+                "border-radius:6px;font-size:11px'>Variant {row.variant}</span>",
+                unsafe_allow_html=True,
             )
 
-            # Optional “Choose this” button
-            if st.button("Select this strategy", key=f"choose_{i}"):
-                st.session_state.chosen_strategy = row.to_dict()
-                st.success(f"Selected **{row.name}** — you can still open others.")
+            with st.expander("📖 Rationale & Trade-offs", expanded=False):
+                rationale_lines = [s.strip() for s in row.rationale.split(". ") if s]
+                for r in rationale_lines:
+                    st.markdown(f"• {r.strip().rstrip('.')}.")
+                st.markdown(
+                    f"**Cost:** {row.cost_pct_of_portfolio:.2f}% of capital  \n"
+                    f"**Horizon:** {row.time_horizon_months} months  \n"
+                    f"**Score:** {row.score:.2f}"
+                )
+
+                if st.button("✔️ Select this strategy", key=f"select_{i}"):
+                    st.session_state.chosen_strategy = row.to_dict()
+                    st.success(f"Selected **{row.name}**")
+
+            st.markdown("</div>", unsafe_allow_html=True)
 
 def clean_md(md: str) -> str:
     md = re.sub(r"(\d)(?=[A-Za-z])", r"\1 ", md)
@@ -592,35 +598,46 @@ if suggest_clicked:
     single_hedge_pct  = st.session_state.get("single_hedge_pct", 1.0)   # %
 
     SYSTEM_JSON = textwrap.dedent("""
-    You are a portfolio-hedging assistant.
-    Respond with **one** JSON object that has a top-level key `strategies`
-    containing 3–4 objects.  Each object **must** include exactly:
+    You are a senior equity strategist advising institutional investors.
 
-    name                 (string)
-    variant              (string, e.g. "A", "B")
-    score                (float 0-1, higher is better)
-    risk_reduction_pct   (integer 0-100)
-    cost_pct_of_portfolio(float)      # e.g. 1.3 means 1.3 % of capital
-    time_horizon_months  (integer)
-    rationale            (string, ≤ 2 sentences)
+    Return exactly one JSON object with a top-level key `strategies` (list of 3–4 items).
+    Each item MUST include the following keys:
 
-    List strategies ordered by `score` descending.  
-    Return *only* valid JSON—no markdown, no code fences.
+    - name: concise label (e.g. "SPY Put Spread", "VIX Call Hedge")
+    - variant: string (e.g. "A", "B", "C") to distinguish alternatives
+    - score: float from 0.0 to 1.0 (higher = more attractive)
+    - risk_reduction_pct: integer (estimated VaR or drawdown reduction, 0–100%)
+    - cost_pct_of_portfolio: float (capital required, % of notional)
+    - time_horizon_months: integer (expected duration)
+    - rationale: exactly 3 sentences:
+    1. Describe the hedge and instrument mechanics clearly.
+    2. Justify why this hedge is relevant based on market context (e.g. volatility skew, event risk, macro positioning).
+    3. Note trade-offs: opportunity cost, convexity loss, or decay risk.
+
+    Rank results by score descending.
+
+    Do not use generalities like "market caution" or "Fed fading" unless tied to a specific instrument.
+    Only return valid JSON. No markdown, no prose.
     """).strip()
 
     USER_JSON = textwrap.dedent(f"""
-    Portfolio: {', '.join(portfolio)}
-    Allocations: {alloc_str}
-    Capital available: ${total_capital:,.0f}
-    Horizon: {horizon} months
-    Headline risks: {risk_string or "none"}
-    Allowed hedge instruments: {', '.join(st.session_state.allowed_instruments)}
-    Budget cap (total): {hedge_budget_pct}% of capital
-    Budget cap (single hedge): {single_hedge_pct}% of capital
-    Ignore these risks: {ignored or "none"}
+        Portfolio tickers: {', '.join(portfolio)}
+        Allocations: {alloc_str}
+        Total capital: ${total_capital:,.0f}
+        Time horizon: {horizon} months
+        Stop-loss triggers: {stop_loss_str or 'none'}
+        Headline risk exposures: {risk_string or 'none'}
+        Allowed hedge instruments: {', '.join(st.session_state.allowed_instruments)}
 
-    Follow the schema above exactly.
-    """).strip()
+        Objective:
+        Generate 3–4 differentiated hedge strategies that reduce downside risk exposure using liquid, cost-efficient instruments.
+        Tailor hedges to real exposures (e.g., tech beta, small-cap skew, macro risk).
+        Use realistic sizing and costs. Avoid duplication.
+        Assume investor is familiar with options, futures, and ETF mechanics.
+
+        Tone: concise, institutional, actionable.
+        Return JSON only.
+        """).strip()
 
     with st.spinner("⚙️  Generating multiple hedging strategies…"):
         raw_json = ask_openai(
@@ -636,6 +653,10 @@ if suggest_clicked:
     except (json.JSONDecodeError, KeyError) as err:
         st.error(f"❌ LLM returned invalid JSON: {err}")
         st.stop()
+
+    # ─── Content quality check ───
+    if df_strat["rationale"].str.len().mean() < 120:
+        st.warning("⚠️ Strategy rationale looks too shallow. The LLM may have ignored the structure.")
 
     # Persist for downstream pages / reruns
     st.session_state.strategy_df = df_strat
