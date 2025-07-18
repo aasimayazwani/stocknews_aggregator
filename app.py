@@ -254,14 +254,6 @@ if "chosen_strategy" not in st.session_state:
 if "strategy_history" not in st.session_state:
     st.session_state.strategy_history = []
 
-"""# ─── inside suggest_clicked, just after render_strategy_cards(df_strat) ───
-st.session_state.strategy_history.append({
-    "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"),
-    "horizon": horizon,
-    "capital": total_capital,
-    "strategy_df": df_strat,
-})"""
-
 # ──────────────────────────── HELPERS ────────────────────────────────
 def render_strategy_cards(df: pd.DataFrame) -> None:
     if df.empty:
