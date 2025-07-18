@@ -257,29 +257,27 @@ if "strategy_history" not in st.session_state:
 # ──────────────────────────── HELPERS ────────────────────────────────
 def render_strategy_cards(df: pd.DataFrame) -> None:
     """
-    Render each hedge strategy as a professional-looking card.
+    Render each hedge strategy as a professional card.
 
     • Card header shows strategy name + first-sentence summary.
-    • Right-hand side shows Risk %, Variant badge.
-    • Expander reveals full 3-sentence rationale, cost, horizon, score,
-      and a “Select this strategy” button.
-    • Selected card is highlighted with a green border.
+    • Metrics (Risk ↓, Variant) on the right.
+    • Expander reveals full 3-sentence rationale, cost, horizon, score.
+    • Selected card (if any) gets a green border.
     """
     if df.empty:
         st.info("No strategies available.")
         return
 
     for i, row in df.iterrows():
-        # ── extract one-line headline (first sentence of rationale) ──────────
+        # ── one-line headline (first sentence of rationale) ────────────────
         headline = row.rationale.split(". ")[0].strip().rstrip(".") + "."
 
-        # ── highlight if this card is the chosen one ─────────────────────────
-        selected   = (
-            st.session_state.get("chosen_strategy", {}).get("name") == row.name
-        )
+        # ── highlight if this card is the chosen one ───────────────────────
+        chosen   = st.session_state.get("chosen_strategy") or {}
+        selected = chosen.get("name") == row.name
         border_col = "#10b981" if selected else "#334155"
 
-        # ── outer card container ─────────────────────────────────────────────
+        # ── outer card container ───────────────────────────────────────────
         with st.container():
             st.markdown(
                 f"""
@@ -294,7 +292,7 @@ def render_strategy_cards(df: pd.DataFrame) -> None:
                 unsafe_allow_html=True,
             )
 
-            # ── header row: title, headline, metrics, variant badge ─────────
+            # ── header row ────────────────────────────────────────────────
             hdr_cols = st.columns([7, 2, 1])
             hdr_cols[0].markdown(
                 f"**{row.name}**  \n"
@@ -309,9 +307,9 @@ def render_strategy_cards(df: pd.DataFrame) -> None:
                 unsafe_allow_html=True,
             )
 
-            # ── expandable detailed section ────────────────────────────────
+            # ── expandable detail section ────────────────────────────────
             with st.expander("📖 Rationale & Trade-offs", expanded=False):
-                # bullet each sentence of the rationale
+                # bullet each sentence of rationale
                 for sent in row.rationale.split(". "):
                     sent = sent.strip().rstrip(".")
                     if sent:
