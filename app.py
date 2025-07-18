@@ -267,9 +267,8 @@ def render_strategy_cards(df: pd.DataFrame) -> None:
     for i, row in df.iterrows():
         # ── create 4-5-word headline from first sentence of rationale ──────
         first_sentence = row.rationale.split(".")[0].strip()
-        headline_words = first_sentence.split()[:5]                  # grab up to 5 words
-        headline = " ".join(headline_words) + "…"                    # add ellipsis
-
+        headline_words = first_sentence.split()[:5]
+        headline = " ".join(headline_words) + "…"
         # ── highlight if selected ─────────────────────────────────────────
         chosen   = st.session_state.get("chosen_strategy") or {}
         selected = chosen.get("name") == row.name
