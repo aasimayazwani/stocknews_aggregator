@@ -261,7 +261,9 @@ def render_strategy_cards(df: pd.DataFrame) -> None:
 
     for i, row in df.iterrows():
         # ── create 4-5-word headline from first sentence of rationale ──────
-        first_sentence = row.rationale.split(".")[0].strip()
+        raw_rationale = row.rationale
+        thesis_text = raw_rationale.get("thesis") if isinstance(raw_rationale, dict) else str(raw_rationale)
+        first_sentence = thesis_text.split(".")[0].strip()
         headline_words = first_sentence.split()[:5]
         headline = " ".join(headline_words) + "…"
         # ── highlight if selected ─────────────────────────────────────────
@@ -296,7 +298,11 @@ def render_strategy_cards(df: pd.DataFrame) -> None:
                 <details style="margin-top: 12px; color: #e2e8f0;">
                     <summary style="cursor: pointer;">📖 View Rationale & Trade-offs</summary>
                     <div style="margin-top: 8px; line-height: 1.6;">
-                        {"<br>".join([f"• {s.strip()}" for s in row.rationale.split('.') if s.strip()])}
+                        {(
+                            f"• {raw_rationale.get('thesis', '').rstrip('.')}.<br>• {raw_rationale.get('tradeoff', '').rstrip('.')}"
+                            if isinstance(raw_rationale, dict)
+                            else "<br>".join(f"• {s.strip()}." for s in str(raw_rationale).split(".") if s.strip())
+                        )}
                     </div>
                     <form method="post">
                         <button type="submit"
@@ -608,6 +614,9 @@ if suggest_clicked:
     #      (replaces the old “settings_prompt” + markdown-parsing flow)
     # ─────────────────────────────────────────────────────────────────────────
 
+    def _length(x):
+        return len(x.get("thesis", "") + x.get("tradeoff", "")) if isinstance(x, dict) else len(str(x))
+
     def avg_stop_loss_pct(df: pd.DataFrame) -> str:
         pct_list = []
         for _, row in df.iterrows():
@@ -709,7 +718,7 @@ if suggest_clicked:
         st.stop()
 
     # ─── Content quality check ───
-    if df_strat["rationale"].str.len().mean() < 120:
+    if df_strat["rationale"].apply(_length).mean() < 120:
         st.warning("⚠️ Strategy rationale looks too shallow. The LLM may have ignored the structure.")
 
     # Persist for downstream pages / reruns
