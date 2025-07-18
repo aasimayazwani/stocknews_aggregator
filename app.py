@@ -4,6 +4,7 @@ from typing import List
 import os
 import streamlit as st
 import pandas as pd
+import json
 import plotly.express as px
 import yfinance as yf
 from config import DEFAULT_MODEL          # local module
@@ -247,7 +248,56 @@ if "outlook_md"  not in st.session_state: st.session_state.outlook_md  = None
 if "risk_cache"  not in st.session_state: st.session_state.risk_cache  = {}  # {ticker: [risks]}
 if "risk_ignore" not in st.session_state: st.session_state.risk_ignore = []
 
+# ─── after first STATE block ───
+if "chosen_strategy" not in st.session_state:
+    st.session_state.chosen_strategy = None
+if "strategy_history" not in st.session_state:
+    st.session_state.strategy_history = []
+
+"""# ─── inside suggest_clicked, just after render_strategy_cards(df_strat) ───
+st.session_state.strategy_history.append({
+    "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"),
+    "horizon": horizon,
+    "capital": total_capital,
+    "strategy_df": df_strat,
+})"""
+
 # ──────────────────────────── HELPERS ────────────────────────────────
+def render_strategy_cards(df: pd.DataFrame) -> None:
+    """
+    Show each strategy in a bordered card with metrics.
+    Expects columns: name, variant, score, risk_reduction_pct,
+                     cost_pct_of_portfolio, time_horizon_months, rationale
+    """
+    if df.empty:
+        st.info("LLM returned no strategies.")
+        return
+
+    for _, row in df.iterrows():
+        with st.container(border=True):
+            # ── header line ───────────────────────────────────────────────
+            h1, h2 = st.columns([6, 1])
+            h1.markdown(f"### {row.name}")
+            h2.markdown(
+                f"<span style='background:#dcfce7;color:#166534;"
+                f"padding:2px 6px;border-radius:4px;font-size:12px;'>"
+                f"Variant {row.variant}</span>",
+                unsafe_allow_html=True,
+            )
+
+            # ── metrics row ───────────────────────────────────────────────
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Risk Reduction", f"{row.risk_reduction_pct}%")
+            m2.metric("Cost", f"{row.cost_pct_of_portfolio:.1f}% of portfolio")
+            m3.metric("Horizon", f"{row.time_horizon_months} mo")
+
+            st.markdown(row.rationale)
+
+            if st.button("Use this strategy", key=f"use_{row.name}"):
+                st.session_state.chosen_strategy = row.to_dict()
+                st.success(f"Selected **{row.name}**")
+
+
 def clean_md(md: str) -> str:
     md = re.sub(r"(\d)(?=[A-Za-z])", r"\1 ", md)
     return md.replace("*", "").replace("_", "")
@@ -484,7 +534,11 @@ if "strategy_history" not in st.session_state:
 if suggest_clicked:
     ignored = "; ".join(st.session_state.risk_ignore) or "None"
     total_capital = sum(st.session_state.portfolio_alloc.values())
-    risk_string = ", ".join(r for ticker in portfolio for r in st.session_state.risk_cache.get(ticker, [])[0]) or "None"
+    #risk_string = ", ".join(r for ticker in portfolio for r in st.session_state.risk_cache.get(ticker, [])[0]) or "None"
+    risk_string = "; ".join(
+        title for t in portfolio
+        for title, _url in st.session_state.risk_cache.get(t, [])
+    )
     alloc_str = "; ".join(f"{k}: ${v:,.0f}" for k, v in st.session_state.portfolio_alloc.items()) or "None"
 
     exp_pref = st.session_state.explanation_pref
@@ -508,181 +562,69 @@ if suggest_clicked:
         f"{ticker}: ${float(sl):.2f}" for ticker, sl in st.session_state.stop_loss_map.items() if pd.notnull(sl)
     ) or "None"
 
-    # Initial prompt to determine strategy settings
-    settings_prompt = textwrap.dedent(f"""
-    You are a **Hedging Strategist**. Based on the portfolio and risks, suggest optimal values for:
-    - Beta match band (range, e.g., 1.10–1.40)
-    - Stop-loss for shorts (%)
-    - Total hedge budget (% of capital)
-    - Max per single hedge (% of capital)
+        # ─────────────────────────────────────────────────────────────────────────
+    # NEW: ask the LLM for 3-4 hedging strategies in structured JSON
+    #      (replaces the old “settings_prompt” + markdown-parsing flow)
+    # ─────────────────────────────────────────────────────────────────────────
+    import json, textwrap
 
-    Portfolio: {', '.join(portfolio)}
-    Allocation: {alloc_str}
-    Risks: {risk_string}
-    Capital: ${total_capital:,.0f}
-    Horizon: {horizon} mo
+    # Fallback sizing rules if you’re not already storing them in session
+    hedge_budget_pct  = st.session_state.get("hedge_budget_pct",  2.0)  # %
+    single_hedge_pct  = st.session_state.get("single_hedge_pct", 1.0)   # %
 
-    Return only the values in this format:
-    Beta match band: X.XX–X.XX
-    Stop-loss: X%
-    Total hedge budget: X%
-    Max per single hedge: X%
+    SYSTEM_JSON = textwrap.dedent("""
+    You are a portfolio-hedging assistant.
+    Respond with **one** JSON object that has a top-level key `strategies`
+    containing 3–4 objects.  Each object **must** include exactly:
+
+    name                 (string)
+    variant              (string, e.g. "A", "B")
+    score                (float 0-1, higher is better)
+    risk_reduction_pct   (integer 0-100)
+    cost_pct_of_portfolio(float)      # e.g. 1.3 means 1.3 % of capital
+    time_horizon_months  (integer)
+    rationale            (string, ≤ 2 sentences)
+
+    List strategies ordered by `score` descending.  
+    Return *only* valid JSON—no markdown, no code fences.
     """).strip()
 
-    with st.spinner("Determining strategy settings…"):
-        settings_response = ask_openai(model, "You are a precise financial strategist.", settings_prompt)
-        settings_lines = settings_response.splitlines()
-        beta_rng = tuple(float(x) for x in re.search(r"Beta match band: (\d+\.\d+)–(\d+\.\d+)", settings_lines[0]).groups())
-        stop_loss = float(re.search(r"Stop-loss: (\d+\.?\d*)%", settings_lines[1]).group(1))
-        hedge_budget_pct = float(re.search(r"Total hedge budget: (\d+\.?\d*)%", settings_lines[2]).group(1))
-        single_hedge_pct = float(re.search(r"Max per single hedge: (\d+\.?\d*)%", settings_lines[3]).group(1))
+    USER_JSON = textwrap.dedent(f"""
+    Portfolio: {', '.join(portfolio)}
+    Allocations: {alloc_str}
+    Capital available: ${total_capital:,.0f}
+    Horizon: {horizon} months
+    Headline risks: {risk_string or "none"}
+    Allowed hedge instruments: {', '.join(st.session_state.allowed_instruments)}
+    Budget cap (total): {hedge_budget_pct}% of capital
+    Budget cap (single hedge): {single_hedge_pct}% of capital
+    Ignore these risks: {ignored or "none"}
 
-    max_hedge_notional = total_capital * hedge_budget_pct / 100
+    Follow the schema above exactly.
+    """).strip()
 
-    avoid_note = ""
-    if st.session_state.avoid_dup_hedges:
-        avoid_note = (
-            "- ❌ **Do NOT suggest hedge instruments already in the user’s portfolio** "
-            f"({', '.join(st.session_state.portfolio)}).\n"
-            "- ✅ Prefer diversifiers (sector ETFs, index futures, inverse ETFs, FX, commodities).\n"
+    with st.spinner("⚙️  Generating multiple hedging strategies…"):
+        raw_json = ask_openai(
+            model=model,
+            system_prompt=SYSTEM_JSON,
+            user_prompt=USER_JSON,
         )
 
-    prompt = textwrap.dedent(f"""
-    👋  You are a **Hedging Strategist** helping investors protect capital while keeping portfolio beta between **{beta_rng[0]:.2f}–{beta_rng[1]:.2f}**.
+    # ───────────────────── parse & validate LLM result ─────────────────────
+    try:
+        data = json.loads(raw_json)
+        df_strat = pd.DataFrame(data["strategies"])
+    except (json.JSONDecodeError, KeyError) as err:
+        st.error(f"❌ LLM returned invalid JSON: {err}")
+        st.stop()
 
-    ─────────────────────────────────
-    🔑 **Key Instructions**
+    # Persist for downstream pages / reruns
+    st.session_state.strategy_df = df_strat
 
-    1. **Hedging Scope**  
-    • Hedge all stocks in the portfolio: **{', '.join(portfolio)}**.
-
-    2. **Allowed Hedge Types**  
-    {', '.join(st.session_state.allowed_instruments)}  
-    *Use only these. Do **NOT** propose anything else.*
-
-    3. **Budget & Sizing Rules**  
-    • Total hedge cost ≤ **{hedge_budget_pct}%** of capital (${total_capital:,.0f})  
-    • Any single hedge ≤ **{single_hedge_pct}%** of capital  
-    • Option premium target ≤ **3 %** of notional  
-    • Max 5 hedges
-
-    4. **When to Hedge**  
-    Flag a position if:  
-    • Its stop-loss sits ≥ 5 % above market **or**  
-    • It shows high headline-risk sensitivity: {risk_string}  
-    Ignore: {ignored}
-
-    ─────────────────────────────────
-    📊 **Portfolio Snapshot**
-
-    • Positions: {', '.join(portfolio)}  
-    • Allocation: {alloc_str}  
-    • Stop-losses: {stop_loss_str or 'None'}  
-    • Horizon: **{horizon} mo** • Capital: **${total_capital:,.0f}**
-
-    ─────────────────────────────────
-    📝 **Deliverables (Markdown only)**
-
-    **A. Hedge List** – one bullet per idea, end each with reference tag `[n]`  
-    `1. **AAPL** — Put. Buy 3× Aug 175P (≤ {rationale_rule}) [1]`
-
-    **B. Sizing Table** – immediately after bullets  
-    ```
-
-| Hedge                 | Qty / Cts |                   \$ Notional |               % Capital |
-| --------------------- | --------- | ----------------------------: | ----------------------: |
-| AAPL Aug 175 P (puts) | 3         |                         3 000 |                     3 % |
-| …                     | …         |                             … |                       … |
-| **Total**             |           | ≤ {max_hedge_notional:,.0f} | ≤ {hedge_budget_pct}% |
-
-    ```
-
-    **C. References**  
-    `[1] https://source.example`
-
-    **D. Summary** – ≤ 300 chars
-
-    **E. Residual Risks** – numbered list, ≤ 25 words each, each ending in a URL
-
-    ─────────────────────────────────
-    👤 **Investor Profile**
-
-    Experience: **{st.session_state.experience_level}**  
-    Detail level: **{st.session_state.explanation_pref}**
-
-    Return the answer in plain Markdown, no HTML or code fences.
-    """).strip()
-
-    with st.spinner("Calling ChatGPT…"):
-        raw_md = ask_openai(model, "You are a precise, citation-rich strategist.", prompt)
-
-    plan_md = raw_md
-
-    footnotes = dict(re.findall(r"\[(\d+)\]\s+(https?://[^\s]+)", plan_md))
-    superscripts_map = "⁰¹²³⁴⁵⁶⁷⁸⁹"
-    for ref_id, url in footnotes.items():
-        superscript = "".join(superscripts_map[int(d)] for d in ref_id)
-        plan_md = plan_md.replace(f"[{ref_id}]", f"[🔗{superscript}]({url})")
-    plan_md = re.sub(r"^\[\d+\]\s+https?://[^\s]+", "", plan_md, flags=re.MULTILINE)
-
-    lines = plan_md.splitlines()
-    hedge_lines = [line for line in lines if re.match(r"^\d+\.\s+(?:\*\*)?(.+?)(?:\*\*)?\s+—\s+", line)]
-
-    st.subheader("📌 Suggested strategy")
-
-    records = []
-    for line in hedge_lines:
-        match = re.match(r"^(\d+)\.\s+(?:\*\*)?(.+?)(?:\*\*)?\s+—\s+(.*?)\s+\[(\d+)\]", line)
-        if match:
-            _, ticker, rationale, ref_id = match.groups()
-            url = footnotes.get(ref_id, "#")
-            records.append({
-                "Ticker": ticker.strip(),
-                "Rationale": rationale.strip(),
-                "Source": url,
-                "Position": "Hedge",
-                "Amount ($)": 0
-            })
-
-    df = pd.DataFrame(records)
-
-    user_df = clean_df.copy()
-    user_df["Position"] = "Long"
-    user_df["Source"] = "User portfolio"
-    user_df["% of Portfolio"] = (user_df["Amount ($)"] / user_df["Amount ($)"].sum() * 100).round(2)
-    user_df["Rationale"] = "—"
-    user_df["Ticker"] = user_df["Ticker"].astype(str)
-
-    df["% of Portfolio"] = 0
-    df["Price"] = "_n/a_"
-    df["Δ 1d %"] = "_n/a_"
-    user_df["Price"] = user_df["Price"].round(2)
-    user_df["Δ 1d %"] = user_df["Δ 1d %"].round(2)
-
-    final_cols = ["Ticker", "Position", "Amount ($)", "% of Portfolio", "Price", "Δ 1d %", "Source", "Rationale"]
-    user_df = user_df[final_cols]
-    missing_cols = [col for col in final_cols if col not in df.columns]
-    for col in missing_cols:
-        df[col] = ""
-    df = df[final_cols]
-    combined_df = pd.concat([user_df, df], ignore_index=True)
-
-    st.session_state.user_df = user_df
-    st.session_state.strategy_df = df
-    st.session_state.rationale_md = plan_md
-    st.session_state.strategy_history.append({
-        "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "horizon": horizon,
-        "beta_band": beta_rng,
-        "capital": total_capital,
-        "strategy_df": df,
-        "rationale_md": plan_md,
-    })
-
-    st.dataframe(combined_df.drop(columns=["Rationale"]), use_container_width=True)
-
-    st.markdown("### 📌 Hedge Strategy Rationale")
-    st.markdown(plan_md)
+    # ───────────────────── render basic “card list” ────────────────────────
+    st.subheader("🛡️ Recommended Hedging Strategies")
+    render_strategy_cards(df_strat)
+    
 
 st.divider()
 st.markdown("### 💬  Quick chat")
