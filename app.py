@@ -265,46 +265,67 @@ st.session_state.strategy_history.append({
 # ──────────────────────────── HELPERS ────────────────────────────────
 def render_strategy_cards(df: pd.DataFrame) -> None:
     if df.empty:
-        st.info("LLM returned no strategies.")
+        st.info("No strategies available.")
         return
 
     for i, row in df.iterrows():
-        is_selected = (
+        selected = (
             st.session_state.chosen_strategy
             and row.name == st.session_state.chosen_strategy.get("name")
         )
 
-        border_color = "#10b981" if is_selected else "#334155"
-        card = st.container()
-        with card:
+        box_color = "#10b981" if selected else "#334155"
+        with st.container():
             st.markdown(
-                f"<div style='border:1px solid {border_color}; border-radius:10px; padding:12px;'>",
-                unsafe_allow_html=True
-            )
-            cols = st.columns([6, 2, 2])
-            cols[0].markdown(f"### {row.name}")
-            cols[1].metric("Risk ↓", f"{row.risk_reduction_pct} %")
-            cols[2].markdown(
-                f"<span style='background:#33415566;padding:4px 8px;"
-                "border-radius:6px;font-size:11px'>Variant {row.variant}</span>",
+                f"""
+                <div style="
+                    border: 1px solid {box_color};
+                    border-radius: 10px;
+                    padding: 16px;
+                    margin-bottom: 16px;
+                    background-color: #1e1f24;
+                ">
+                <div style="display:flex; justify-content: space-between; align-items:center;">
+                    <div style="font-size: 18px; font-weight: 600;">{row.name}</div>
+                    <div style="font-size: 13px; background-color: #334155;
+                        color: #f8fafc; padding: 4px 10px; border-radius: 6px;">
+                        Variant {row.variant}
+                    </div>
+                </div>
+
+                <div style="margin-top: 8px;">
+                    <b>Risk Reduction:</b> {row.risk_reduction_pct}% &nbsp;&nbsp;
+                    <b>Cost:</b> {row.cost_pct_of_portfolio:.1f}% of capital &nbsp;&nbsp;
+                    <b>Horizon:</b> {row.time_horizon_months} months
+                </div>
+
+                <details style="margin-top: 12px; color: #e2e8f0;">
+                    <summary style="cursor: pointer;">📖 View Rationale & Trade-offs</summary>
+                    <div style="margin-top: 8px; line-height: 1.6;">
+                        {"<br>".join([f"• {sent.strip()}" for sent in row.rationale.split('.') if sent.strip()])}
+                    </div>
+                    <form method="post">
+                        <button type="submit"
+                            style="
+                                margin-top: 12px;
+                                padding: 6px 12px;
+                                background-color: #10b981;
+                                color: white;
+                                border: none;
+                                border-radius: 6px;
+                                cursor: pointer;
+                            "
+                            name="select_strategy_{i}"
+                        >✔️ Select this strategy</button>
+                    </form>
+                </details>
+                </div>
+                """,
                 unsafe_allow_html=True,
             )
 
-            with st.expander("📖 Rationale & Trade-offs", expanded=False):
-                rationale_lines = [s.strip() for s in row.rationale.split(". ") if s]
-                for r in rationale_lines:
-                    st.markdown(f"• {r.strip().rstrip('.')}.")
-                st.markdown(
-                    f"**Cost:** {row.cost_pct_of_portfolio:.2f}% of capital  \n"
-                    f"**Horizon:** {row.time_horizon_months} months  \n"
-                    f"**Score:** {row.score:.2f}"
-                )
-
-                if st.button("✔️ Select this strategy", key=f"select_{i}"):
-                    st.session_state.chosen_strategy = row.to_dict()
-                    st.success(f"Selected **{row.name}**")
-
-            st.markdown("</div>", unsafe_allow_html=True)
+            if st.session_state.get(f"select_strategy_{i}"):
+                st.session_state.chosen_strategy = row.to_dict()
 
 def clean_md(md: str) -> str:
     md = re.sub(r"(\d)(?=[A-Za-z])", r"\1 ", md)
