@@ -1,5 +1,6 @@
 from __future__ import annotations
 import re, textwrap, requests
+import json, textwrap
 from typing import List
 import os
 import streamlit as st
@@ -69,12 +70,6 @@ with st.sidebar.expander("📌 Investor Profile", expanded=False):
         default=st.session_state.allowed_instruments,
         key="allowed_instruments"
     )
-
-with st.sidebar.expander("🧮 Investment Settings", expanded=True):
-    pass  # Removed Focus stock and other settings
-
-with st.sidebar.expander("⚙️ Strategy Settings", expanded=False):
-    pass  # Removed sliders for beta band, stop-loss, total budget, and max hedge
 
 with st.sidebar.expander("🧹 Session Tools", expanded=False):
     with st.sidebar.expander("🧠 Previous Strategies", expanded=True):
@@ -612,34 +607,51 @@ if suggest_clicked:
     # NEW: ask the LLM for 3-4 hedging strategies in structured JSON
     #      (replaces the old “settings_prompt” + markdown-parsing flow)
     # ─────────────────────────────────────────────────────────────────────────
-    import json, textwrap
+
+    def avg_stop_loss_pct(df: pd.DataFrame) -> str:
+        pct_list = []
+        for _, row in df.iterrows():
+            sl = row["Stop-Loss ($)"]
+            px = row["Price"]
+            if pd.notnull(sl) and px and px > 0:
+                pct_list.append(abs(px - sl) / px * 100)
+        return f"{round(sum(pct_list) / len(pct_list), 1)}" if pct_list else "n/a"
 
     # Fallback sizing rules if you’re not already storing them in session
     hedge_budget_pct  = st.session_state.get("hedge_budget_pct",  2.0)  # %
     single_hedge_pct  = st.session_state.get("single_hedge_pct", 1.0)   # %
 
     SYSTEM_JSON = textwrap.dedent("""
-    You are a senior equity strategist advising institutional investors.
+        You are a senior equity-derivatives strategist.
 
-    Return exactly one JSON object with a top-level key `strategies` (list of 3–4 items).
-    Each item MUST include the following keys:
+        Return ONE valid JSON object:
 
-    - name: concise label (e.g. "SPY Put Spread", "VIX Call Hedge")
-    - variant: string (e.g. "A", "B", "C") to distinguish alternatives
-    - score: float from 0.0 to 1.0 (higher = more attractive)
-    - risk_reduction_pct: integer (estimated VaR or drawdown reduction, 0–100%)
-    - cost_pct_of_portfolio: float (capital required, % of notional)
-    - time_horizon_months: integer (expected duration)
-    - rationale: exactly 3 sentences:
-    1. Describe the hedge and instrument mechanics clearly.
-    2. Justify why this hedge is relevant based on market context (e.g. volatility skew, event risk, macro positioning).
-    3. Note trade-offs: opportunity cost, convexity loss, or decay risk.
+        strategies: [            # 3-4 ideas, ranked by score
+        {
+            name:  string,
+            variant: string,           # A / B / C
+            score:  float,             # 0-1
+            risk_reduction_pct: int,   # VaR or max-drawdown Δ
+            horizon_months: int,       # overall hedge horizon
+            legs: [                    # 1-3 hedge legs
+            {
+                instrument: string,        # e.g. "SPY Sep 430P", "ESU4 future"
+                position:  string,         # "long", "short", "ratio 2:1"
+                notional_pct: float,       # % of portfolio notionally hedged
+                cost_pct_capital: float,   # premium or margin as % of capital
+                expiry:  string            # "2025-09-20", or "3m"
+            }
+            ],
+            aggregate_cost_pct: float,     # sum of leg costs
+            rationale: {                   # keep it tight
+            thesis:   string,            # ≤ 25 words
+            tradeoff: string             # ≤ 20 words
+            }
+        }
+        ]
 
-    Rank results by score descending.
-
-    Do not use generalities like "market caution" or "Fed fading" unless tied to a specific instrument.
-    Only return valid JSON. No markdown, no prose.
-    """).strip()
+        Return JSON only.
+        """).strip()
 
     USER_JSON = textwrap.dedent(f"""
         Portfolio tickers: {', '.join(portfolio)}
@@ -649,6 +661,18 @@ if suggest_clicked:
         Stop-loss triggers: {stop_loss_str or 'none'}
         Headline risk exposures: {risk_string or 'none'}
         Allowed hedge instruments: {', '.join(st.session_state.allowed_instruments)}
+
+        Holdings: {alloc_str}
+        Capital: ${total_capital:,.0f}
+        Average stop-loss distance: {avg_stop_loss_pct}%
+        Key risks: {risk_string or "none"}
+        Allowed instruments: {', '.join(st.session_state.allowed_instruments)}
+
+        Requirements:
+        • 1-3 hedge legs per strategy
+        • Total premium ≤ {hedge_budget_pct}% of capital
+        • Legs may hedge at index, sector, or single-name level
+        • Show expiry explicitly (e.g. Sep-24).
 
         Objective:
         Generate 3–4 differentiated hedge strategies that reduce downside risk exposure using liquid, cost-efficient instruments.
@@ -670,7 +694,16 @@ if suggest_clicked:
     # ───────────────────── parse & validate LLM result ─────────────────────
     try:
         data = json.loads(raw_json)
-        df_strat = pd.DataFrame(data["strategies"])
+        # ---- split top-level metrics and legs -------------------------------
+        df_strat = pd.DataFrame(                        # ← keep this name so the rest
+            [{k: v for k, v in s.items() if k != "legs"}  # of your code (cards etc.)
+            for s in data["strategies"]]                # doesn’t need edits
+        )
+
+        # store legs per strategy index
+        st.session_state.strategy_legs = {
+            idx: s["legs"] for idx, s in enumerate(data["strategies"])
+        }
     except (json.JSONDecodeError, KeyError) as err:
         st.error(f"❌ LLM returned invalid JSON: {err}")
         st.stop()
