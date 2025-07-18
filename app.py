@@ -256,78 +256,68 @@ if "strategy_history" not in st.session_state:
 
 # ──────────────────────────── HELPERS ────────────────────────────────
 def render_strategy_cards(df: pd.DataFrame) -> None:
-    """
-    Render each hedge strategy as a professional-looking card.
-
-    • Card header shows strategy name + first-sentence summary.
-    • Right-hand side shows Risk %, Variant badge.
-    • Expander reveals full 3-sentence rationale, cost, horizon, score,
-      and a “Select this strategy” button.
-    • Selected card is highlighted with a green border.
-    """
     if df.empty:
         st.info("No strategies available.")
         return
 
     for i, row in df.iterrows():
-        # ── extract one-line headline (first sentence of rationale) ──────────
-        headline = row.rationale.split(". ")[0].strip().rstrip(".") + "."
-
-        # ── highlight if this card is the chosen one ─────────────────────────
-        selected   = (
-            st.session_state.get("chosen_strategy", {}).get("name") == row.name
+        selected = (
+            st.session_state.chosen_strategy
+            and row.name == st.session_state.chosen_strategy.get("name")
         )
-        border_col = "#10b981" if selected else "#334155"
 
-        # ── outer card container ─────────────────────────────────────────────
+        box_color = "#10b981" if selected else "#334155"
         with st.container():
             st.markdown(
                 f"""
                 <div style="
-                    border: 1px solid {border_col};
+                    border: 1px solid {box_color};
                     border-radius: 10px;
                     padding: 16px;
                     margin-bottom: 16px;
                     background-color: #1e1f24;
                 ">
+                <div style="display:flex; justify-content: space-between; align-items:center;">
+                    <div style="font-size: 18px; font-weight: 600;">{row.name}</div>
+                    <div style="font-size: 13px; background-color: #334155;
+                        color: #f8fafc; padding: 4px 10px; border-radius: 6px;">
+                        Variant {row.variant}
+                    </div>
+                </div>
+
+                <div style="margin-top: 8px;">
+                    <b>Risk Reduction:</b> {row.risk_reduction_pct}% &nbsp;&nbsp;
+                    <b>Cost:</b> {row.cost_pct_of_portfolio:.1f}% of capital &nbsp;&nbsp;
+                    <b>Horizon:</b> {row.time_horizon_months} months
+                </div>
+
+                <details style="margin-top: 12px; color: #e2e8f0;">
+                    <summary style="cursor: pointer;">📖 View Rationale & Trade-offs</summary>
+                    <div style="margin-top: 8px; line-height: 1.6;">
+                        {"<br>".join([f"• {sent.strip()}" for sent in row.rationale.split('.') if sent.strip()])}
+                    </div>
+                    <form method="post">
+                        <button type="submit"
+                            style="
+                                margin-top: 12px;
+                                padding: 6px 12px;
+                                background-color: #10b981;
+                                color: white;
+                                border: none;
+                                border-radius: 6px;
+                                cursor: pointer;
+                            "
+                            name="select_strategy_{i}"
+                        >✔️ Select this strategy</button>
+                    </form>
+                </details>
+                </div>
                 """,
                 unsafe_allow_html=True,
             )
 
-            # ── header row: title, headline, metrics, variant badge ─────────
-            hdr_cols = st.columns([7, 2, 1])
-            hdr_cols[0].markdown(
-                f"**{row.name}**  \n"
-                f"<span style='font-size:13px;color:#cbd5e1;'>{headline}</span>",
-                unsafe_allow_html=True,
-            )
-            hdr_cols[1].metric("Risk ↓", f"{row.risk_reduction_pct}%")
-            hdr_cols[2].markdown(
-                f"<span style='background:#334155;padding:4px 8px;"
-                f"border-radius:6px;font-size:11px;color:#f8fafc;'>"
-                f"Variant {row.variant}</span>",
-                unsafe_allow_html=True,
-            )
-
-            # ── expandable detailed section ────────────────────────────────
-            with st.expander("📖 Rationale & Trade-offs", expanded=False):
-                # bullet each sentence of the rationale
-                for sent in row.rationale.split(". "):
-                    sent = sent.strip().rstrip(".")
-                    if sent:
-                        st.markdown(f"• {sent}.")
-                st.markdown(
-                    f"**Cost:** {row.cost_pct_of_portfolio:.2f}% of capital  \n"
-                    f"**Horizon:** {row.time_horizon_months} months  \n"
-                    f"**Score:** {row.score:.2f}"
-                )
-
-                if st.button("✔️ Select this strategy", key=f"select_{i}"):
-                    st.session_state.chosen_strategy = row.to_dict()
-                    st.success(f"Selected **{row.name}**")
-
-            # close the outer <div>
-            st.markdown("</div>", unsafe_allow_html=True)
+            if st.session_state.get(f"select_strategy_{i}"):
+                st.session_state.chosen_strategy = row.to_dict()
 
 def clean_md(md: str) -> str:
     md = re.sub(r"(\d)(?=[A-Za-z])", r"\1 ", md)
