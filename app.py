@@ -265,38 +265,40 @@ st.session_state.strategy_history.append({
 # ──────────────────────────── HELPERS ────────────────────────────────
 def render_strategy_cards(df: pd.DataFrame) -> None:
     """
-    Show each strategy in a bordered card with metrics.
-    Expects columns: name, variant, score, risk_reduction_pct,
-                     cost_pct_of_portfolio, time_horizon_months, rationale
+    Render each strategy as a collapsible card.  Clicking the header toggles
+    an expander that shows the full description / justification.
     """
     if df.empty:
         st.info("LLM returned no strategies.")
         return
 
-    for _, row in df.iterrows():
-        with st.container(border=True):
-            # ── header line ───────────────────────────────────────────────
-            h1, h2 = st.columns([6, 1])
-            h1.markdown(f"### {row.name}")
-            h2.markdown(
-                f"<span style='background:#dcfce7;color:#166534;"
-                f"padding:2px 6px;border-radius:4px;font-size:12px;'>"
-                f"Variant {row.variant}</span>",
-                unsafe_allow_html=True,
+    for i, row in df.iterrows():
+        # ── closed-state header ─────────────────────────────────────────
+        header_cols = st.columns([6, 3, 1])
+        header_cols[0].markdown(f"**{row.name}**")
+        header_cols[1].metric(
+            "Risk ↓",
+            f"{row.risk_reduction_pct} %",
+            help="Percent reduction in portfolio VaR"
+        )
+        header_cols[2].markdown(
+            f"<span style='background:#33415566;padding:4px 8px;"
+            "border-radius:6px;font-size:11px'>Variant {row.variant}</span>",
+            unsafe_allow_html=True,
+        )
+
+        # ── body ────────────────────────────────────────────────────────
+        with st.expander("View rationale & details", expanded=False):
+            st.markdown(f"**Rationale:** {row.rationale}")
+            st.markdown(
+                f"*Cost:* **{row.cost_pct_of_portfolio:.1f}%** of capital &nbsp;|&nbsp; "
+                f"*Horizon:* **{row.time_horizon_months} mo**"
             )
 
-            # ── metrics row ───────────────────────────────────────────────
-            m1, m2, m3 = st.columns(3)
-            m1.metric("Risk Reduction", f"{row.risk_reduction_pct}%")
-            m2.metric("Cost", f"{row.cost_pct_of_portfolio:.1f}% of portfolio")
-            m3.metric("Horizon", f"{row.time_horizon_months} mo")
-
-            st.markdown(row.rationale)
-
-            if st.button("Use this strategy", key=f"use_{row.name}"):
+            # Optional “Choose this” button
+            if st.button("Select this strategy", key=f"choose_{i}"):
                 st.session_state.chosen_strategy = row.to_dict()
-                st.success(f"Selected **{row.name}**")
-
+                st.success(f"Selected **{row.name}** — you can still open others.")
 
 def clean_md(md: str) -> str:
     md = re.sub(r"(\d)(?=[A-Za-z])", r"\1 ", md)
@@ -624,6 +626,9 @@ if suggest_clicked:
     # ───────────────────── render basic “card list” ────────────────────────
     st.subheader("🛡️ Recommended Hedging Strategies")
     render_strategy_cards(df_strat)
+
+    if st.session_state.chosen_strategy:
+        st.info(f"**Chosen strategy:** {st.session_state.chosen_strategy['name']}")
     
 
 st.divider()
