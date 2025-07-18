@@ -70,13 +70,10 @@ with st.sidebar.expander("📌 Investor Profile", expanded=False):
     )
 
 with st.sidebar.expander("🧮 Investment Settings", expanded=True):
-    pass  # Removed Focus stock selectbox
+    pass  # Removed Focus stock and other settings
 
 with st.sidebar.expander("⚙️ Strategy Settings", expanded=False):
-    st.slider("🎯 Beta match band", 0.5, 2.0, (1.15, 1.50), step=0.01, key="beta_band")
-    st.slider("🔻 Stop-loss for shorts (%)", 1, 20, 10, key="stop_loss")
-    st.slider("💰 Total hedge budget (% of capital)", 5, 25, 10, key="total_budget")
-    st.slider("📉 Max per single hedge (% of capital)", 1, 10, 5, key="max_hedge")
+    pass  # Removed sliders for beta band, stop-loss, total budget, and max hedge
 
 with st.sidebar.expander("🧹 Session Tools", expanded=False):
     with st.sidebar.expander("🧠 Previous Strategies", expanded=True):
@@ -108,12 +105,9 @@ experience_level   = st.session_state.get("experience_level", "Expert")
 explanation_pref   = st.session_state.get("explanation_pref", "Just the strategy")
 avoid_overlap      = st.session_state.get("avoid_overlap", True)
 allowed_instruments = st.session_state.get("allowed_instruments", ["Put Options", "Collar Strategy"])
-beta_rng           = st.session_state.get("beta_band", (1.15, 1.50))
-stop_loss          = st.session_state.get("stop_loss", 10)
-hedge_budget_pct   = st.session_state.get("total_budget", 10)
-single_hedge_pct   = st.session_state.get("max_hedge", 5)
 horizon            = st.session_state.get("time_horizon", 6)
 portfolio          = st.session_state.get("portfolio", ["AAPL", "MSFT"])  # Use all portfolio stocks
+model = DEFAULT_MODEL  # Define model variable using the imported DEFAULT_MODEL
 
 st.markdown("""
 <style>
@@ -251,8 +245,7 @@ if "history"     not in st.session_state: st.session_state.history     = []
 if "portfolio"   not in st.session_state: st.session_state.portfolio   = ["AAPL", "MSFT"]
 if "outlook_md"  not in st.session_state: st.session_state.outlook_md  = None
 if "risk_cache"  not in st.session_state: st.session_state.risk_cache  = {}  # {ticker: [risks]}
-if "risk_ignore" not in st.session_state: st.session_state.risk_ignore = []  # selected exclusions
-if "selected_risks" not in st.session_state: st.session_state.selected_risks = []
+if "risk_ignore" not in st.session_state: st.session_state.risk_ignore = []
 
 # ──────────────────────────── HELPERS ────────────────────────────────
 def clean_md(md: str) -> str:
@@ -363,7 +356,7 @@ def web_risk_scan(ticker: str):
 if "history"     not in st.session_state: st.session_state.history     = []
 if "portfolio"   not in st.session_state: st.session_state.portfolio   = ["AAPL", "MSFT"]
 if "outlook_md"  not in st.session_state: st.session_state.outlook_md  = None
-if "risk_cache"  not in st.session_state: st.session_state.risk_cache  = {}
+if "risk_cache"  not in st.session_state: st.session_state.risk_cache  = {}  # {ticker: [risks]}
 if "risk_ignore" not in st.session_state: st.session_state.risk_ignore = []
 
 # ────────────────────────── SIDEBAR – SETTINGS ───────────────────────
@@ -382,27 +375,33 @@ portfolio_stocks = st.session_state.portfolio
 # ───────────────────────────── PORTFOLIO UI ──────────────────────────
 st.markdown("### Position sizes Editable")
 
-if "alloc_df" not in st.session_state:
-    tickers = st.session_state.portfolio
-    st.session_state.alloc_df = pd.DataFrame({
-        "Ticker": tickers,
-        "Amount ($)": [10_000] * len(tickers),
-        "Stop-Loss ($)": [None] * len(tickers)
-    })
+uploaded_file = st.file_uploader("Upload your portfolio (CSV)", type=["csv"])
+if uploaded_file:
+    # Read the uploaded CSV
+    df = pd.read_csv(uploaded_file)
+    required_cols = ["Ticker", "Amount ($)"]
+    if not all(col in df.columns for col in required_cols):
+        st.error("CSV must contain 'Ticker' and 'Amount ($)' columns.")
+    else:
+        # Ensure 'Stop-Loss ($)' is present, default to None if missing
+        df["Stop-Loss ($)"] = df.get("Stop-Loss ($)", [None] * len(df))
+        st.session_state.alloc_df = df[["Ticker", "Amount ($)", "Stop-Loss ($)"]]
+        st.session_state.portfolio = df["Ticker"].tolist()
+        st.session_state.portfolio_alloc = dict(zip(df["Ticker"], df["Amount ($)"]))
+else:
+    if "alloc_df" not in st.session_state:
+        st.session_state.alloc_df = pd.DataFrame({
+            "Ticker": ["AAPL", "MSFT"],
+            "Amount ($)": [10000, 10000],
+            "Stop-Loss ($)": [None, None]
+        })
+    st.session_state.alloc_df = (
+        st.session_state.alloc_df
+        .query("Ticker in @st.session_state.portfolio")
+        .sort_values("Amount ($)", ascending=False, ignore_index=True)
+    )
 
-st.session_state.alloc_df = (
-    st.session_state.alloc_df
-      .query("Ticker in @st.session_state.portfolio")
-      .sort_values("Amount ($)", ascending=False, ignore_index=True)
-)
-
-clean_df = (
-    st.session_state.alloc_df
-      .dropna(subset=["Ticker"])
-      .query("Ticker != ''")
-      .drop_duplicates(subset=["Ticker"])
-      .sort_values("Amount ($)", ascending=False, ignore_index=True)
-)
+clean_df = st.session_state.alloc_df.copy()
 
 tickers = clean_df["Ticker"].tolist()
 prices_df = fetch_prices(tickers, period="2d")
@@ -416,22 +415,15 @@ else:
     clean_df["Price"] = 0.0
     clean_df["Δ 1d %"] = 0.0
 
-editor_df = st.data_editor(
-    clean_df,
-    disabled={"Price": True, "Δ 1d %": True},
-    num_rows="dynamic",
-    use_container_width=True,
-    key="alloc_editor",
-    hide_index=True,
-)
+st.dataframe(clean_df, use_container_width=True)
 
 st.session_state.stop_loss_map = dict(
-    zip(editor_df["Ticker"], editor_df["Stop-Loss ($)"])
+    zip(clean_df["Ticker"], clean_df["Stop-Loss ($)"])
 )
-st.session_state.alloc_df = editor_df
-st.session_state.portfolio = editor_df["Ticker"].tolist()
+st.session_state.alloc_df = clean_df
+st.session_state.portfolio = clean_df["Ticker"].tolist()
 st.session_state.portfolio_alloc = dict(
-    zip(editor_df["Ticker"], editor_df["Amount ($)"])
+    zip(clean_df["Ticker"], clean_df["Amount ($)"])
 )
 
 ticker_df = pd.DataFrame({
@@ -516,8 +508,35 @@ if suggest_clicked:
         f"{ticker}: ${float(sl):.2f}" for ticker, sl in st.session_state.stop_loss_map.items() if pd.notnull(sl)
     ) or "None"
 
-    hedge_budget_pct   = st.session_state.get("total_budget", 10)
-    single_hedge_pct   = st.session_state.get("max_hedge", 5)
+    # Initial prompt to determine strategy settings
+    settings_prompt = textwrap.dedent(f"""
+    You are a **Hedging Strategist**. Based on the portfolio and risks, suggest optimal values for:
+    - Beta match band (range, e.g., 1.10–1.40)
+    - Stop-loss for shorts (%)
+    - Total hedge budget (% of capital)
+    - Max per single hedge (% of capital)
+
+    Portfolio: {', '.join(portfolio)}
+    Allocation: {alloc_str}
+    Risks: {risk_string}
+    Capital: ${total_capital:,.0f}
+    Horizon: {horizon} mo
+
+    Return only the values in this format:
+    Beta match band: X.XX–X.XX
+    Stop-loss: X%
+    Total hedge budget: X%
+    Max per single hedge: X%
+    """).strip()
+
+    with st.spinner("Determining strategy settings…"):
+        settings_response = ask_openai(model, "You are a precise financial strategist.", settings_prompt)
+        settings_lines = settings_response.splitlines()
+        beta_rng = tuple(float(x) for x in re.search(r"Beta match band: (\d+\.\d+)–(\d+\.\d+)", settings_lines[0]).groups())
+        stop_loss = float(re.search(r"Stop-loss: (\d+\.?\d*)%", settings_lines[1]).group(1))
+        hedge_budget_pct = float(re.search(r"Total hedge budget: (\d+\.?\d*)%", settings_lines[2]).group(1))
+        single_hedge_pct = float(re.search(r"Max per single hedge: (\d+\.?\d*)%", settings_lines[3]).group(1))
+
     max_hedge_notional = total_capital * hedge_budget_pct / 100
 
     avoid_note = ""
@@ -529,7 +548,7 @@ if suggest_clicked:
         )
 
     prompt = textwrap.dedent(f"""
-    👋  You are a **Hedging Strategist** helping investors protect capital while keeping portfolio beta between **{beta_rng[0]:.2f} – {beta_rng[1]:.2f}**.
+    👋  You are a **Hedging Strategist** helping investors protect capital while keeping portfolio beta between **{beta_rng[0]:.2f}–{beta_rng[1]:.2f}**.
 
     ─────────────────────────────────
     🔑 **Key Instructions**
@@ -627,7 +646,7 @@ if suggest_clicked:
 
     df = pd.DataFrame(records)
 
-    user_df = editor_df.copy()
+    user_df = clean_df.copy()
     user_df["Position"] = "Long"
     user_df["Source"] = "User portfolio"
     user_df["% of Portfolio"] = (user_df["Amount ($)"] / user_df["Amount ($)"].sum() * 100).round(2)
