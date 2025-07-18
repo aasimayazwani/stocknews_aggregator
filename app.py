@@ -256,17 +256,25 @@ if "strategy_history" not in st.session_state:
 
 # ──────────────────────────── HELPERS ────────────────────────────────
 def render_strategy_cards(df: pd.DataFrame) -> None:
+    """
+    Render strategy cards.
+    Title now shows a 4–5-word justification headline instead of the raw name.
+    """
     if df.empty:
         st.info("No strategies available.")
         return
 
     for i, row in df.iterrows():
-        selected = (
-            st.session_state.chosen_strategy
-            and row.name == st.session_state.chosen_strategy.get("name")
-        )
+        # ── create 4-5-word headline from first sentence of rationale ──────
+        first_sentence = row.rationale.split(".")[0].strip()
+        headline_words = first_sentence.split()[:5]                  # grab up to 5 words
+        headline = " ".join(headline_words) + "…"                    # add ellipsis
 
+        # ── highlight if selected ─────────────────────────────────────────
+        chosen   = st.session_state.get("chosen_strategy") or {}
+        selected = chosen.get("name") == row.name
         box_color = "#10b981" if selected else "#334155"
+
         with st.container():
             st.markdown(
                 f"""
@@ -278,7 +286,7 @@ def render_strategy_cards(df: pd.DataFrame) -> None:
                     background-color: #1e1f24;
                 ">
                 <div style="display:flex; justify-content: space-between; align-items:center;">
-                    <div style="font-size: 18px; font-weight: 600;">{row.name}</div>
+                    <div style="font-size: 18px; font-weight: 600;">{headline}</div>
                     <div style="font-size: 13px; background-color: #334155;
                         color: #f8fafc; padding: 4px 10px; border-radius: 6px;">
                         Variant {row.variant}
@@ -294,7 +302,7 @@ def render_strategy_cards(df: pd.DataFrame) -> None:
                 <details style="margin-top: 12px; color: #e2e8f0;">
                     <summary style="cursor: pointer;">📖 View Rationale & Trade-offs</summary>
                     <div style="margin-top: 8px; line-height: 1.6;">
-                        {"<br>".join([f"• {sent.strip()}" for sent in row.rationale.split('.') if sent.strip()])}
+                        {"<br>".join([f"• {s.strip()}" for s in row.rationale.split('.') if s.strip()])}
                     </div>
                     <form method="post">
                         <button type="submit"
@@ -316,6 +324,7 @@ def render_strategy_cards(df: pd.DataFrame) -> None:
                 unsafe_allow_html=True,
             )
 
+            # update selection flag if user clicked the button
             if st.session_state.get(f"select_strategy_{i}"):
                 st.session_state.chosen_strategy = row.to_dict()
 
