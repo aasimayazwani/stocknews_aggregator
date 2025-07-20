@@ -3,14 +3,15 @@ import pandas as pd
 import re
 from typing import List
 
-# Custom CSS for consistency with app.py
+# ---------- 1. Global styles ----------
 st.markdown(
     """
     <style>
-    .stExpander > div, .card {
+    .stExpander > div,
+    .card {
         border: 1px solid #E5E7EB;
         border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.10);
     }
     .card {
         background-color: #1E1F24;
@@ -19,96 +20,90 @@ st.markdown(
     }
     </style>
     """,
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
 
+# ---------- 2. Helper functions ----------
+def clean_md(md: str) -> str:
+    """Remove stray characters and cram‑together digits/letters."""
+    md = re.sub(r"(\d)(?=[A-Za-z])", r"\1 ", md)
+    return md.replace("*", "").replace("_", "")
+
+def render_backtest_chart(
+    unhedged_values: List[float],
+    hedged_values: List[float],
+    dates: List[str],
+):
+    """Simple line chart comparing unhedged vs. hedged curves."""
+    df = pd.DataFrame(
+        {
+            "Date": pd.to_datetime(dates),
+            "Unhedged Portfolio": unhedged_values,
+            "Hedged Portfolio": hedged_values,
+        }
+    )
+    st.line_chart(df.set_index("Date"))
+
+# ---------- 3. Main card renderer ----------
 def render_strategy_cards(df: pd.DataFrame) -> None:
+    """
+    Render each strategy in a nice card.  Selecting a card sets
+    st.session_state.chosen_strategy and triggers st.rerun().
+    """
     if df.empty:
         st.info("No strategies available.")
         return
+
     for i, row in df.iterrows():
+        # Build a concise headline from the first sentence
         raw_rationale = row.rationale
-        thesis_text = raw_rationale.get("thesis") if isinstance(raw_rationale, dict) else str(raw_rationale)
-        first_sentence = thesis_text.split(".")[0].strip()
-        headline_words = first_sentence.split()[:5]
-        headline = " ".join(headline_words) + "…"
+        thesis = (
+            raw_rationale.get("thesis")
+            if isinstance(raw_rationale, dict)
+            else str(raw_rationale)
+        )
+        headline = " ".join(thesis.split()[:5]) + "…"
+
         chosen = st.session_state.get("chosen_strategy") or {}
         selected = chosen.get("name") == row.name
-        box_color = "#10b981" if selected else "#60A5FA"
+        border = "#10b981" if selected else "#60A5FA"
+
         with st.container():
             st.markdown(
                 f"""
-                <div class="card" style="border: 1px solid {box_color};">
-                <div style="display:flex; justify-content: space-between; align-items:center;">
-                    <div style="font-size: 20px; font-weight: 600;">{headline}</div>
-                    <div style="font-size: 14px; background-color: #334155; color: #f8fafc; padding: 4px 10px; border-radius: 6px;">
-                        Variant {row.variant}
+                <div class="card" style="border: 1px solid {border};">
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div style="font-size:20px; font-weight:600;">{headline}</div>
+                    <div style="font-size:14px; background:#334155; color:#F8FAFC; padding:4px 10px; border-radius:6px;">
+                      Variant {row.variant}
                     </div>
-                </div>
-                <div style="margin-top: 8px; line-height: 1.8;">
-                    <b>Risk Reduction:</b> {row.risk_reduction_pct}%  
-                    <b>Cost:</b> {row.get("aggregate_cost_pct", 0):.1f}% of capital  
-                    <b>Horizon:</b> {row.get("horizon_months", "—")} months
-                </div>
-                <details style="margin-top: 12px; color: #e2e8f0;">
-                    <summary style="cursor: pointer;">📖 View Rationale & Trade-offs</summary>
-                    <div style="margin-top: 8px; line-height: 1.6;">
-                        {(
-                            f"• {raw_rationale.get('thesis', '').rstrip('.')}.<br>• {raw_rationale.get('tradeoff', '').rstrip('.')}"
-                            if isinstance(raw_rationale, dict)
-                            else "<br>".join(f"• {s.strip()}." for s in str(raw_rationale).split(".") if s.strip())
-                        )}
+                  </div>
+                  <div style="margin-top:8px; line-height:1.8;">
+                    <b>Risk Reduction:</b> {row.risk_reduction_pct}%  
+                    <b>Cost:</b> {row.get('aggregate_cost_pct',0):.1f}% of capital  
+                    <b>Horizon:</b> {row.get('horizon_months','—')} months
+                  </div>
+                  <details style="margin-top:12px; color:#E2E8F0;">
+                    <summary style="cursor:pointer;">📖 View Rationale & Trade‑offs</summary>
+                    <div style="margin-top:8px; line-height:1.6;">
+                      {(
+                        f"• {raw_rationale.get('thesis','').rstrip('.')}.<br>• {raw_rationale.get('tradeoff','').rstrip('.')}"
+                        if isinstance(raw_rationale, dict)
+                        else "<br>".join(f"• {s.strip()}." for s in str(raw_rationale).split('.') if s.strip())
+                      )}
                     </div>
-                    <form method="post">
-                        <button type="submit" style="margin-top: 12px; padding: 6px 12px; background-color: #1E3A8A; color: white; border: none; border-radius: 6px; cursor: pointer;" name="select_strategy_{i}">✔️ Select this strategy</button>
-                    </form>
-                </details>
+                  </details>
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
-            if st.session_state.get(f"select_strategy_{i}"):
+
+            # **Real Streamlit button ― no HTML form**
+            if st.button(
+                "✔️ Select this strategy",
+                key=f"select_strategy_{i}",
+                help="Set this strategy as active and enable back‑testing",
+            ):
                 st.session_state.chosen_strategy = row.to_dict()
-                st.rerun()  # Force rerender to reflect the selection
-
-def clean_md(md: str) -> str:
-    md = re.sub(r"(\d)(?=[A-Za-z])", r"\1 ", md)
-    return md.replace("*", "").replace("_", "")
-
-def render_rationale(df: pd.DataFrame) -> None:
-    if df.empty:
-        st.info("No hedge rationale to show.")
-        return
-    total = df["Amount ($)"].sum()
-    st.markdown(
-        f"A total of **${total:,.0f}** was allocated to hedge instruments to mitigate key risks in the portfolio.\n\nBelow is the explanation for each hedge component:"
-    )
-    for _, row in df.iterrows():
-        tick = row.get("Ticker", "—").strip()
-        pos = row.get("Position", "—").title()
-        amt = row.get("Amount ($)", 0)
-        rat = row.get("Rationale", "No rationale provided").strip()
-        src = row.get("Source", "").strip()
-        card = (
-            f"<div class='card' style='color:#f1f5f9'>"
-            f"<b>{tick} ({pos})</b> — <span style='color:#22d3ee'>${amt:,.0f}</span><br>{rat}"
-        )
-        if re.match(r'^https?://', src):
-            card += f"<br><a href='{src}' target='_blank' style='color:#60a5fa;'>Source ↗</a>"
-        card += "</div>"
-        st.markdown(card, unsafe_allow_html=True)
-
-def render_backtest_chart(unhedged_values: List[float], hedged_values: List[float], dates: List[str]):
-    """
-    Render a line chart comparing unhedged vs. hedged portfolio values.
-    Args:
-        unhedged_values: List of unhedged portfolio values over time.
-        hedged_values: List of hedged portfolio values over time.
-        dates: List of corresponding dates.
-    """
-    df = pd.DataFrame({
-        'Date': pd.to_datetime(dates),
-        'Unhedged Portfolio': unhedged_values,
-        'Hedged Portfolio': hedged_values
-    })
-    st.line_chart(df.set_index('Date'))
+                st.session_state.strategy_df = df  # keep for back‑test lookup
+                st.rerun()
