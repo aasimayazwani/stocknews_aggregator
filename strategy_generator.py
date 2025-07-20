@@ -17,31 +17,33 @@ def generate_strategies(model, portfolio, total_capital, horizon, risk_string, a
     }[explanation_pref]
     SYSTEM_JSON = textwrap.dedent("""
         You are a senior equity-derivatives strategist.
-        Return ONE valid JSON object:
-        strategies: [
-            {
-                name: string,
-                variant: string,
-                score: float,
-                risk_reduction_pct: int,
-                horizon_months: int,
-                legs: [
-                    {
-                        instrument: string,
-                        position: string,
-                        notional_pct: float,
-                        cost_pct_capital: float,
-                        expiry: string
+        Return only the JSON object, without any additional text, explanations, or code blocks like ```json
+        The JSON should be:
+        {
+            "strategies": [
+                {
+                    "name": "string",
+                    "variant": "string",
+                    "score": float,
+                    "risk_reduction_pct": int,
+                    "horizon_months": int,
+                    "legs": [
+                        {
+                            "instrument": "string",
+                            "position": "string",
+                            "notional_pct": float,
+                            "cost_pct_capital": float,
+                            "expiry": "string"
+                        }
+                    ],
+                    "aggregate_cost_pct": float,
+                    "rationale": {
+                        "thesis": "string",
+                        "tradeoff": "string"
                     }
-                ],
-                aggregate_cost_pct: float,
-                rationale: {
-                    thesis: string,
-                    tradeoff: string
                 }
-            }
-        ]
-        Return JSON only.
+            ]
+        }
     """).strip()
     USER_JSON = textwrap.dedent(f"""
         Portfolio tickers: {', '.join(portfolio)}
@@ -58,19 +60,28 @@ def generate_strategies(model, portfolio, total_capital, horizon, risk_string, a
         Generate 3–4 differentiated hedge strategies that reduce downside risk exposure using liquid, cost-efficient instruments.
         {experience_note}
         {rationale_rule}
-        Return JSON only.
+        Return only the JSON object.
     """).strip()
     with st.spinner("⚙️ Generating multiple hedging strategies…"):
-        raw_json = ask_openai(model=model, system_prompt=SYSTEM_JSON, user_prompt=USER_JSON)
+        raw_response = ask_openai(model=model, system_prompt=SYSTEM_JSON, user_prompt=USER_JSON)
+        # Extract JSON object from response
+        start = raw_response.find("{")
+        end = raw_response.rfind("}") + 1
+        if start != -1 and end != -1:
+            raw_json = raw_response[start:end]
+        else:
+            raw_json = ""
+        # Validate and parse
         if not raw_json.strip().startswith("{"):
             st.error("❌ LLM did not return valid JSON.")
-            st.code(raw_json.strip() or "[Empty response]", language="text")
+            st.code(raw_response.strip() or "[Empty response]", language="text")
             return pd.DataFrame()
-    try:
-        data = json.loads(raw_json)
-        df_strat = pd.DataFrame([{k: v for k, v in s.items() if k != "legs"} for s in data["strategies"]])
-        st.session_state.strategy_legs = {idx: s["legs"] for idx, s in enumerate(data["strategies"])}
-        return df_strat
-    except (json.JSONDecodeError, KeyError) as err:
-        st.error(f"❌ LLM returned invalid JSON: {err}")
-        return pd.DataFrame()
+        try:
+            data = json.loads(raw_json)
+            df_strat = pd.DataFrame([{k: v for k, v in s.items() if k != "legs"} for s in data["strategies"]])
+            st.session_state.strategy_legs = {idx: s["legs"] for idx, s in enumerate(data["strategies"])}
+            return df_strat
+        except json.JSONDecodeError as err:
+            st.error(f"❌ Failed to parse JSON: {err}")
+            st.code(raw_json, language="json")
+            return pd.DataFrame()
