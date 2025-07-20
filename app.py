@@ -8,6 +8,7 @@ from strategy_generator import generate_strategies
 from backtest import backtest_strategy
 from config import DEFAULT_MODEL
 from openai_client import ask_openai
+from datetime import datetime, timedelta
 
 st.set_page_config(page_title="Hedge Strategy Chatbot", layout="centered")
 
@@ -42,7 +43,8 @@ if "risk_cache" not in st.session_state: st.session_state.risk_cache = {}
 if "risk_ignore" not in st.session_state: st.session_state.risk_ignore = []
 if "chosen_strategy" not in st.session_state: st.session_state.chosen_strategy = None
 if "strategy_history" not in st.session_state: st.session_state.strategy_history = []
-if "backtest_duration" not in st.session_state: st.session_state.backtest_duration = 12  # Default to 12 months
+if "backtest_start_date" not in st.session_state: st.session_state.backtest_start_date = datetime(2024, 7, 20) - timedelta(days=365)
+if "backtest_end_date" not in st.session_state: st.session_state.backtest_end_date = datetime(2024, 7, 20)
 
 # Sidebar: Investor Profile
 with st.sidebar.expander("📌 Investor Profile", expanded=False):
@@ -98,15 +100,24 @@ with st.sidebar.expander("🧹 Session Tools", expanded=False):
                     st.markdown("**Strategy Rationale**")
                     st.markdown(run["rationale_md"])
     suggest_clicked = st.sidebar.button("🚀 Suggest strategy", type="primary", use_container_width=True)
-    # New Backtest Duration Option
-    with st.sidebar.expander("⏳ Backtest Duration", expanded=True):
-        backtest_duration = st.slider(
-            label="Backtest period (months):",
-            min_value=1,
-            max_value=24,
-            value=st.session_state.backtest_duration,
-            key="backtest_duration"
+    # New Backtest Date Range Option
+    with st.sidebar.expander("📅 Backtest Date Range", expanded=True):
+        backtest_start_date = st.date_input(
+            label="Backtest Start Date",
+            value=st.session_state.backtest_start_date,
+            key="backtest_start_date"
         )
+        backtest_end_date = st.date_input(
+            label="Backtest End Date",
+            value=st.session_state.backtest_end_date,
+            key="backtest_end_date"
+        )
+        # Ensure end date is not before start date
+        if backtest_end_date < backtest_start_date:
+            st.warning("End date cannot be before start date. Adjusting to start date.")
+            backtest_end_date = backtest_start_date
+            st.session_state.backtest_end_date = backtest_end_date
+
     if st.button("🗑️ Clear Portfolio"): st.session_state.portfolio_alloc = {}
     if st.button("🧽 Clear Chat History"): st.session_state.chat_history = []
     if st.button("🗑️ Clear Strategy History"): st.session_state.strategy_history = []
@@ -208,12 +219,17 @@ if suggest_clicked:
     # Check for chosen strategy and display backtest option
     if st.session_state.chosen_strategy:
         st.info(f"**Chosen strategy:** {st.session_state.chosen_strategy['name']}")
-        if st.button("📊 Run Backtest"):
-            # Fetch historical data for portfolio and hedge instruments using backtest_duration
+        st.button("📊 Run Backtest", key="run_backtest")  # Ensure button is prominent
+        if st.session_state.get("run_backtest"):
+            # Fetch historical data for portfolio and hedge instruments using date range
             portfolio_tickers = st.session_state.portfolio
             hedge_tickers = list(set([leg['instrument'].split()[0] for leg in st.session_state.strategy_legs.get(df_strat.index[df_strat['name'] == st.session_state.chosen_strategy['name']].tolist()[0], [])]))
             all_tickers = portfolio_tickers + hedge_tickers
-            backtest_data = fetch_backtest_data(all_tickers, period=f"{st.session_state.backtest_duration}m")
+            backtest_data = fetch_backtest_data(
+                all_tickers,
+                start_date=st.session_state.backtest_start_date.strftime('%Y-%m-%d'),
+                end_date=st.session_state.backtest_end_date.strftime('%Y-%m-%d')
+            )
             
             # Run backtest
             backtest_results = backtest_strategy(
