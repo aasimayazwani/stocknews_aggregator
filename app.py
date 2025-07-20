@@ -45,6 +45,9 @@ defaults = {
 for k, v in defaults.items():
     st.session_state.setdefault(k, v)
 
+if "portfolio_alloc" not in st.session_state:
+    st.session_state.portfolio_alloc = {"AAPL": 10000, "MSFT": 10000}
+
 # ---------- 3. Sidebar ----------
 with st.sidebar.expander("📌 Investor Profile", expanded=False):
     experience = st.selectbox(
@@ -123,6 +126,19 @@ with st.sidebar.expander("🧹 Session Tools", expanded=False):  # outer remains
 st.title("Equity Strategy Assistant")
 
 # Portfolio uploader (unchanged) …
+uploaded_file = st.file_uploader("Upload Portfolio CSV", type=["csv"])
+if uploaded_file:
+    try:
+        df = pd.read_csv(uploaded_file)
+        df["Ticker"] = df["Ticker"].astype(str).str.upper()
+        df["Amount"] = pd.to_numeric(df["Amount"], errors="coerce")
+        df.dropna(subset=["Ticker", "Amount"], inplace=True)
+
+        st.session_state.portfolio = df["Ticker"].tolist()
+        st.session_state.portfolio_alloc = dict(zip(df["Ticker"], df["Amount"]))
+        st.success("✅ Portfolio uploaded successfully.")
+    except Exception as e:
+        st.error(f"❌ Error parsing CSV: {e}")
 
 # ---------- 5. Strategy Suggestion ----------
 if suggest_clicked:
