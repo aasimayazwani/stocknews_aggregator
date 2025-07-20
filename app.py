@@ -216,10 +216,11 @@ if suggest_clicked:
     st.subheader("🛡️ Recommended Hedging Strategies")
     render_strategy_cards(df_strat)
 
-    # Check for chosen strategy and display backtest option
+    # Check for chosen strategy and display backtest option prominently
     if st.session_state.chosen_strategy:
         st.info(f"**Chosen strategy:** {st.session_state.chosen_strategy['name']}")
-        st.button("📊 Run Backtest", key="run_backtest")  # Ensure button is prominent
+        if st.button("📊 Run Backtest", key="run_backtest_button"):
+            st.session_state.run_backtest = True
         if st.session_state.get("run_backtest"):
             # Fetch historical data for portfolio and hedge instruments using date range
             portfolio_tickers = st.session_state.portfolio
