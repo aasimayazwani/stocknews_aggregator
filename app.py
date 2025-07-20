@@ -11,6 +11,29 @@ from openai_client import ask_openai
 
 st.set_page_config(page_title="Hedge Strategy Chatbot", layout="centered")
 
+# Custom CSS for styling
+st.markdown(
+    """
+    <style>
+    .stExpander > div {
+        border: 1px solid #E5E7EB;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    .stButton > button {
+        background-color: #1E3A8A;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 5px;
+    }
+    .stButton > button:hover {
+        background-color: #1E40AF;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 # Session state initialization
 if "history" not in st.session_state: st.session_state.history = []
 if "portfolio" not in st.session_state: st.session_state.portfolio = ["AAPL", "MSFT"]
@@ -82,49 +105,52 @@ with st.sidebar.expander("🧹 Session Tools", expanded=False):
 st.title("Equity Strategy Assistant")
 
 # Portfolio UI
-uploaded_file = st.file_uploader("Upload your portfolio (CSV)", type=["csv"])
-if uploaded_file:
-    try:
-        content = uploaded_file.getvalue().decode("utf-8", errors="ignore")
-        df = pd.read_csv(StringIO(content), engine="python", on_bad_lines="warn")
-    except Exception as e:
-        st.error("❌ Error reading CSV. Please check for missing quotes, commas, or formatting issues.")
-        st.exception(e)
-        st.stop()
-    required_cols = ["Ticker", "Amount ($)"]
-    if not all(col in df.columns for col in required_cols):
-        st.error("CSV must contain at least 'Ticker' and 'Amount ($)' columns.")
-        st.stop()
-    if "Stop-Loss ($)" not in df.columns: df["Stop-Loss ($)"] = None
-    df["Ticker"] = df["Ticker"].astype(str).str.upper()
-    st.session_state.alloc_df = df[["Ticker", "Amount ($)", "Stop-Loss ($)"]]
-    st.session_state.portfolio = df["Ticker"].tolist()
-    st.session_state.portfolio_alloc = dict(zip(df["Ticker"], df["Amount ($)"]))
-else:
-    if "alloc_df" not in st.session_state:
-        st.session_state.alloc_df = pd.DataFrame({
-            "Ticker": ["AAPL", "MSFT"],
-            "Amount ($)": [10000, 10000],
-            "Stop-Loss ($)": [None, None]
-        })
-    st.session_state.alloc_df = (
-        st.session_state.alloc_df
-        .query("Ticker in @st.session_state.portfolio")
-        .sort_values("Amount ($)", ascending=False, ignore_index=True)
-    )
+st.subheader("📊 Portfolio")
+with st.expander("View Portfolio", expanded=not suggest_clicked):  # Collapses after strategy suggestion
+    uploaded_file = st.file_uploader("Upload your portfolio (CSV)", type=["csv"])
+    if uploaded_file:
+        try:
+            content = uploaded_file.getvalue().decode("utf-8", errors="ignore")
+            df = pd.read_csv(StringIO(content), engine="python", on_bad_lines="warn")
+        except Exception as e:
+            st.error("❌ Error reading CSV. Please check for missing quotes, commas, or formatting issues.")
+            st.exception(e)
+            st.stop()
+        required_cols = ["Ticker", "Amount ($)"]
+        if not all(col in df.columns for col in required_cols):
+            st.error("CSV must contain at least 'Ticker' and 'Amount ($)' columns.")
+            st.stop()
+        if "Stop-Loss ($)" not in df.columns:
+            df["Stop-Loss ($)"] = None
+        df["Ticker"] = df["Ticker"].astype(str).str.upper()
+        st.session_state.alloc_df = df[["Ticker", "Amount ($)", "Stop-Loss ($)"]]
+        st.session_state.portfolio = df["Ticker"].tolist()
+        st.session_state.portfolio_alloc = dict(zip(df["Ticker"], df["Amount ($)"]))
+    else:
+        if "alloc_df" not in st.session_state:
+            st.session_state.alloc_df = pd.DataFrame({
+                "Ticker": ["AAPL", "MSFT"],
+                "Amount ($)": [10000, 10000],
+                "Stop-Loss ($)": [None, None]
+            })
+        st.session_state.alloc_df = (
+            st.session_state.alloc_df
+            .query("Ticker in @st.session_state.portfolio")
+            .sort_values("Amount ($)", ascending=False, ignore_index=True)
+        )
 
-clean_df = st.session_state.alloc_df.copy()
-tickers = clean_df["Ticker"].tolist()
-prices_df = fetch_prices(tickers, period="2d")
-if not prices_df.empty:
-    last = prices_df.iloc[-1]
-    prev = prices_df.iloc[-2]
-    clean_df["Price"] = last.reindex(tickers).round(2).values
-    clean_df["Δ 1d %"] = ((last - prev) / prev * 100).reindex(tickers).round(2).values
-else:
-    clean_df["Price"] = 0.0
-    clean_df["Δ 1d %"] = 0.0
-st.dataframe(clean_df, use_container_width=True)
+    clean_df = st.session_state.alloc_df.copy()
+    tickers = clean_df["Ticker"].tolist()
+    prices_df = fetch_prices(tickers, period="2d")
+    if not prices_df.empty:
+        last = prices_df.iloc[-1]
+        prev = prices_df.iloc[-2]
+        clean_df["Price"] = last.reindex(tickers).round(2).values
+        clean_df["Δ 1d %"] = ((last - prev) / prev * 100).reindex(tickers).round(2).values
+    else:
+        clean_df["Price"] = 0.0
+        clean_df["Δ 1d %"] = 0.0
+    st.dataframe(clean_df, use_container_width=True)
 
 # Risk Scan
 with st.sidebar.expander("🔍 Key headline risks", expanded=True):
@@ -208,7 +234,7 @@ if suggest_clicked:
 
 # Chat
 st.divider()
-st.markdown("### 💬  Quick chat")
+st.markdown("### 💬 Quick chat")
 for role, msg in st.session_state.history:
     st.chat_message(role).write(msg)
 if q := st.chat_input("Ask anything…"):
