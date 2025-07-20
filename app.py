@@ -107,7 +107,6 @@ with st.sidebar.expander("🧹 Session Tools", expanded=False):
             value=st.session_state.backtest_duration,
             key="backtest_duration"
         )
-        st.session_state.backtest_duration = backtest_duration
     if st.button("🗑️ Clear Portfolio"): st.session_state.portfolio_alloc = {}
     if st.button("🧽 Clear Chat History"): st.session_state.chat_history = []
     if st.button("🗑️ Clear Strategy History"): st.session_state.strategy_history = []
