@@ -46,8 +46,8 @@ def render_strategy_cards(df: pd.DataFrame) -> None:
                     </div>
                 </div>
                 <div style="margin-top: 8px; line-height: 1.8;">
-                    <b>Risk Reduction:</b> {row.risk_reduction_pct}% &nbsp;
-                    <b>Cost:</b> {row.get("aggregate_cost_pct", 0):.1f}% of capital &nbsp;
+                    <b>Risk Reduction:</b> {row.risk_reduction_pct}%  
+                    <b>Cost:</b> {row.get("aggregate_cost_pct", 0):.1f}% of capital  
                     <b>Horizon:</b> {row.get("horizon_months", "—")} months
                 </div>
                 <details style="margin-top: 12px; color: #e2e8f0;">
@@ -69,6 +69,7 @@ def render_strategy_cards(df: pd.DataFrame) -> None:
             )
             if st.session_state.get(f"select_strategy_{i}"):
                 st.session_state.chosen_strategy = row.to_dict()
+                st.rerun()  # Force rerender to reflect the selection
 
 def clean_md(md: str) -> str:
     md = re.sub(r"(\d)(?=[A-Za-z])", r"\1 ", md)

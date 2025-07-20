@@ -195,6 +195,7 @@ if suggest_clicked:
     st.subheader("🛡️ Recommended Hedging Strategies")
     render_strategy_cards(df_strat)
 
+    # Check for chosen strategy and display backtest option
     if st.session_state.chosen_strategy:
         st.info(f"**Chosen strategy:** {st.session_state.chosen_strategy['name']}")
         if st.button("📊 Run Backtest"):
