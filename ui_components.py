@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import re
+from typing import List
 
 def render_strategy_cards(df: pd.DataFrame) -> None:
     if df.empty:
@@ -76,3 +77,18 @@ def render_rationale(df: pd.DataFrame) -> None:
             card += f"<br><a href='{src}' target='_blank' style='color:#60a5fa;'>Source ↗</a>"
         card += "</div>"
         st.markdown(card, unsafe_allow_html=True)
+
+def render_backtest_chart(unhedged_values: List[float], hedged_values: List[float], dates: List[str]):
+    """
+    Render a line chart comparing unhedged vs. hedged portfolio values.
+    Args:
+        unhedged_values: List of unhedged portfolio values over time.
+        hedged_values: List of hedged portfolio values over time.
+        dates: List of corresponding dates.
+    """
+    df = pd.DataFrame({
+        'Date': pd.to_datetime(dates),
+        'Unhedged Portfolio': unhedged_values,
+        'Hedged Portfolio': hedged_values
+    })
+    st.line_chart(df.set_index('Date'))

@@ -2,11 +2,12 @@ import re
 import requests
 import pandas as pd
 import yfinance as yf
-from typing import List
+from typing import List, Dict
 from config import DEFAULT_MODEL
 from openai_client import ask_openai
 import os
 import streamlit as st
+from datetime import datetime, timedelta
 
 def fallback_ticker_lookup(name: str, model_name: str = "gpt-4.1-mini") -> str:
     prompt = f"What is the stock ticker symbol for the publicly traded company '{name}'?"
@@ -41,6 +42,33 @@ def search_tickers(query: str) -> List[str]:
 def fetch_prices(tickers: List[str], period="2d"):
     df = yf.download(tickers, period=period, progress=False, auto_adjust=True)["Close"]
     return df.dropna(axis=1, how="all")
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_backtest_data(tickers: List[str], start_date: str = None, end_date: str = None, period: str = "1y") -> Dict[str, pd.DataFrame]:
+    """
+    Fetch historical price data for backtesting.
+    Args:
+        tickers: List of ticker symbols (e.g., ['AAPL', 'MSFT', 'SPY']).
+        start_date: Start date (e.g., '2023-01-01'). If None, uses period.
+        end_date: End date (e.g., '2024-01-01'). If None, uses today.
+        period: Period to fetch if start_date/end_date not provided (e.g., '1y').
+    Returns:
+        Dictionary mapping tickers to their historical price DataFrames.
+    """
+    if not end_date:
+        end_date = datetime.today().strftime('%Y-%m-%d')
+    if not start_date:
+        start_date = (datetime.today() - timedelta(days=365)).strftime('%Y-%m-%d')
+    
+    data = {}
+    for ticker in tickers:
+        try:
+            df = yf.download(ticker, start=start_date, end=end_date, period=period, progress=False, auto_adjust=True)
+            if not df.empty:
+                data[ticker] = df[['Open', 'High', 'Low', 'Close', 'Volume']]
+        except Exception as e:
+            st.warning(f"Failed to fetch data for {ticker}: {e}")
+    return data
 
 @st.cache_data(ttl=900, show_spinner=False)
 def web_risk_scan(ticker: str):

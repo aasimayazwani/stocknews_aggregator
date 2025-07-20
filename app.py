@@ -2,9 +2,10 @@ from __future__ import annotations
 import streamlit as st
 import pandas as pd
 from io import StringIO
-from ui_components import render_strategy_cards, render_rationale, clean_md
-from utils import search_tickers, fetch_prices, web_risk_scan
+from ui_components import render_strategy_cards, render_rationale, clean_md, render_backtest_chart
+from utils import search_tickers, fetch_prices, web_risk_scan, fetch_backtest_data
 from strategy_generator import generate_strategies
+from backtest import backtest_strategy
 from config import DEFAULT_MODEL
 from openai_client import ask_openai
 
@@ -165,7 +166,45 @@ if suggest_clicked:
         experience_level=st.session_state.experience_level
     )
     st.session_state.strategy_df = df_strat
+    st.subheader("🛡️ Recommended Hedging Strategies")
     render_strategy_cards(df_strat)
+
+    if st.session_state.chosen_strategy:
+        st.info(f"**Chosen strategy:** {st.session_state.chosen_strategy['name']}")
+        if st.button("📊 Run Backtest"):
+            # Fetch historical data for portfolio and hedge instruments
+            portfolio_tickers = st.session_state.portfolio
+            hedge_tickers = list(set([leg['instrument'].split()[0] for leg in st.session_state.strategy_legs.get(df_strat.index[df_strat['name'] == st.session_state.chosen_strategy['name']].tolist()[0], [])]))
+            all_tickers = portfolio_tickers + hedge_tickers
+            backtest_data = fetch_backtest_data(all_tickers, period=f"{st.session_state.time_horizon}m")
+            
+            # Run backtest
+            backtest_results = backtest_strategy(
+                st.session_state.chosen_strategy,
+                {t: backtest_data[t] for t in portfolio_tickers if t in backtest_data},
+                {t: backtest_data[t] for t in hedge_tickers if t in backtest_data},
+                total_capital
+            )
+            
+            # Display backtest results
+            st.subheader("Backtest Results")
+            st.markdown(f"""
+            - **Unhedged Final Value**: ${backtest_results['unhedged_final_value']:,.2f}
+            - **Hedged Final Value**: ${backtest_results['hedged_final_value']:,.2f}
+            - **Risk Reduction**: {backtest_results['risk_reduction_pct']:.2f}%
+            - **Max Drawdown (Unhedged)**: {backtest_results['max_drawdown_unhedged']:.2f}%
+            - **Max Drawdown (Hedged)**: {backtest_results['max_drawdown_hedged']:.2f}%
+            - **Total Hedge Cost**: ${backtest_results['total_cost']:,.2f}
+            """)
+            
+            # Render portfolio value chart
+            if backtest_results.get('dates'):
+                st.subheader("Portfolio Value Over Time")
+                render_backtest_chart(
+                    backtest_results['unhedged_values'],
+                    backtest_results['hedged_values'],
+                    backtest_results['dates']
+                )
 
 # Chat
 st.divider()
