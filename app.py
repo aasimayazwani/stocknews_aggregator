@@ -30,7 +30,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ---------- 2. Session state ----------
+# ---------- 2. Session state ----------
 defaults = {
     "history": [],
     "portfolio": ["AAPL", "MSFT"],
@@ -49,7 +49,7 @@ if "portfolio_alloc" not in st.session_state:
     st.session_state.portfolio_alloc = {"AAPL": 10000, "MSFT": 10000}
 
 # ---------- 3. Sidebar ----------
-with st.sidebar.expander("📌 Investor Profile", expanded=False):
+with st.sidebar.expander("\ud83d\udccc Investor Profile", expanded=False):
     experience = st.selectbox(
         "Investor experience",
         ["Beginner", "Intermediate", "Expert"],
@@ -74,75 +74,61 @@ with st.sidebar.expander("📌 Investor Profile", expanded=False):
         key="time_horizon",
     )
 
-    # Allowed instruments logic unchanged …
-
-# --- Session Tools (now collapsed by default) ---
-with st.sidebar.expander("🧹 Session Tools", expanded=False):  # outer remains collapsed
-    with st.sidebar.expander(
-        "🧠 Previous Strategies", expanded=False
-    ):  # inner now collapsed too
+# --- Session Tools ---
+with st.sidebar.expander("\ud83d\udeb9 Session Tools", expanded=False):
+    with st.sidebar.expander("\ud83e\udde0 Previous Strategies", expanded=False):
         history = st.session_state.get("strategy_history", [])
         if not history:
             st.info("No previous strategies yet.")
         else:
             for idx, run in reversed(list(enumerate(history))):
                 with st.expander(
-                    f"Run {idx+1} — {run['timestamp']} | Horizon {run['horizon']} mo"
+                    f"Run {idx+1} — {run['timestamp']} | Horizon {run['horizon']} mo"
                 ):
                     st.markdown(
-                        f"**Capital**: ${run['capital']:,0f}  \n**Beta Band**: {run['beta_band'][0]}–{run['beta_band'][1]}"
+                        f"**Capital**: ${run['capital']:,0f}  \n**Beta Band**: {run['beta_band'][0]}–{run['beta_band'][1]}"
                     )
                     st.dataframe(run["strategy_df"], use_container_width=True)
                     st.markdown("**Strategy Rationale**")
                     st.markdown(run["rationale_md"])
 
-    suggest_clicked = st.sidebar.button("🚀 Suggest strategy", type="primary")
+    suggest_clicked = st.sidebar.button("\ud83d\ude80 Suggest strategy", type="primary")
 
-    # Back‑test date range
-    with st.sidebar.expander("📅 Backtest Date Range", expanded=True):
-        st.date_input(
-            "Backtest Start Date",
-            value=st.session_state.backtest_start_date,
-            key="backtest_start_date",
-        )
-        st.date_input(
-            "Backtest End Date",
-            value=st.session_state.backtest_end_date,
-            key="backtest_end_date",
-        )
+    with st.sidebar.expander("\ud83d\uddd3\ufe0f Backtest Date Range", expanded=True):
+        st.date_input("Backtest Start Date", value=st.session_state.backtest_start_date, key="backtest_start_date")
+        st.date_input("Backtest End Date", value=st.session_state.backtest_end_date, key="backtest_end_date")
         if st.session_state.backtest_end_date < st.session_state.backtest_start_date:
             st.warning("End date cannot be before start date. Resetting.")
             st.session_state.backtest_end_date = st.session_state.backtest_start_date
 
-    # Quick reset buttons …
-    if st.button("🗑️ Clear Portfolio"):
+    if st.button("\ud83d\uddd1\ufe0f Clear Portfolio"):
         st.session_state.portfolio_alloc = {}
-    if st.button("🧽 Clear Chat History"):
+    if st.button("\ud83e\uddfd Clear Chat History"):
         st.session_state.history = []
-    if st.button("🗑️ Clear Strategy History"):
+    if st.button("\ud83d\uddd1\ufe0f Clear Strategy History"):
         st.session_state.strategy_history = []
 
 # ---------- 4. Main body ----------
 st.title("Equity Strategy Assistant")
 
-# Portfolio uploader (unchanged) …
-uploaded_file = st.file_uploader("Upload Portfolio CSV", type=["csv"])
+uploaded_file = st.file_uploader("Upload your portfolio (CSV with Ticker and Amount columns)", type=["csv"])
 if uploaded_file:
     try:
-        df = pd.read_csv(uploaded_file)
+        content = uploaded_file.getvalue().decode("utf-8", errors="ignore")
+        df = pd.read_csv(StringIO(content), engine="python", on_bad_lines="warn")
+        df = df.rename(columns=lambda x: x.strip())
         df["Ticker"] = df["Ticker"].astype(str).str.upper()
         df["Amount"] = pd.to_numeric(df["Amount"], errors="coerce")
         df.dropna(subset=["Ticker", "Amount"], inplace=True)
-
         st.session_state.portfolio = df["Ticker"].tolist()
         st.session_state.portfolio_alloc = dict(zip(df["Ticker"], df["Amount"]))
         st.success("✅ Portfolio uploaded successfully.")
     except Exception as e:
-        st.error(f"❌ Error parsing CSV: {e}")
+        st.error("❌ Error reading portfolio file.")
+        st.exception(e)
 
 # ---------- 5. Strategy Suggestion ----------
 if suggest_clicked:
-    # build df_strat as before
     df_strat = generate_strategies(
         model=DEFAULT_MODEL,
         portfolio=st.session_state.portfolio,
@@ -155,18 +141,17 @@ if suggest_clicked:
         explanation_pref=st.session_state.explanation_pref,
         experience_level=st.session_state.experience_level,
     )
-    st.session_state.strategy_df = df_strat  # keep for later
-    st.subheader("🛡️ Recommended Hedging Strategies")
+    st.session_state.strategy_df = df_strat
+    st.subheader("\ud83d\udee1\ufe0f Recommended Hedging Strategies")
     render_strategy_cards(df_strat)
 
-# ---------- 6. Back‑test section ----------
+# ---------- 6. Back-test section ----------
 if st.session_state.chosen_strategy:
     st.info(f"**Chosen strategy:** {st.session_state.chosen_strategy['name']}")
-    if st.button("📊 Run Backtest", key="run_backtest_button"):
+    if st.button("\ud83d\udcca Run Backtest", key="run_backtest_button"):
         st.session_state.run_backtest = True
 
     if st.session_state.get("run_backtest"):
-        # Use stored DF to locate legs → no NameError
         df_strat = st.session_state.strategy_df
         strat_idx = df_strat.index[
             df_strat["name"] == st.session_state.chosen_strategy["name"]
@@ -214,7 +199,7 @@ if st.session_state.chosen_strategy:
 
 # ---------- 7. Chat interface ----------
 st.divider()
-st.markdown("### 💬 Quick chat")
+st.markdown("### \ud83d\udcac Quick chat")
 
 for role, msg in st.session_state.history:
     st.chat_message(role).write(msg)
