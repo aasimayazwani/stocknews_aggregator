@@ -163,29 +163,30 @@ with st.expander("View Portfolio", expanded=not suggest_clicked):  # Collapses a
     st.dataframe(clean_df, use_container_width=True)
 
 # Risk Scan
-with st.sidebar.expander("🔍 Key headline risks", expanded=True):
-    for ticker in st.session_state.portfolio:
-        if ticker not in st.session_state.risk_cache:
-            with st.spinner(f"Scanning web for {ticker}…"):
-                st.session_state.risk_cache[ticker] = web_risk_scan(ticker)
-        risk_tuples = st.session_state.risk_cache[ticker]
-        risk_titles = [t[0] for t in risk_tuples]
-        risk_links = {title: url for title, url in risk_tuples}
-        st.markdown(f"### Risks for {ticker}")
-        selected_risks = []
-        for i, risk in enumerate(risk_titles):
-            key = f"risk_{ticker}_{i}"
-            default = True if key not in st.session_state else st.session_state[key]
-            cols = st.columns([0.1, 0.8, 0.1])
-            with cols[0]:
-                is_selected = st.checkbox(label=f"Select: {risk}", key=key, value=default, label_visibility="collapsed")
-            with cols[1]:
-                st.markdown(risk)
-            with cols[2]:
-                st.markdown(f"[ℹ️]({risk_links.get(risk, '#')})")
-            if is_selected: selected_risks.append(risk)
-        st.session_state.selected_risks = selected_risks
-        st.session_state.risk_ignore = [r for r in risk_titles if r not in selected_risks]
+if False:
+    with st.sidebar.expander("🔍 Key headline risks", expanded=True):
+        for ticker in st.session_state.portfolio:
+            if ticker not in st.session_state.risk_cache:
+                with st.spinner(f"Scanning web for {ticker}…"):
+                    st.session_state.risk_cache[ticker] = web_risk_scan(ticker)
+            risk_tuples = st.session_state.risk_cache[ticker]
+            risk_titles = [t[0] for t in risk_tuples]
+            risk_links = {title: url for title, url in risk_tuples}
+            st.markdown(f"### Risks for {ticker}")
+            selected_risks = []
+            for i, risk in enumerate(risk_titles):
+                key = f"risk_{ticker}_{i}"
+                default = True if key not in st.session_state else st.session_state[key]
+                cols = st.columns([0.1, 0.8, 0.1])
+                with cols[0]:
+                    is_selected = st.checkbox(label=f"Select: {risk}", key=key, value=default, label_visibility="collapsed")
+                with cols[1]:
+                    st.markdown(risk)
+                with cols[2]:
+                    st.markdown(f"[ℹ️]({risk_links.get(risk, '#')})")
+                if is_selected: selected_risks.append(risk)
+            st.session_state.selected_risks = selected_risks
+            st.session_state.risk_ignore = [r for r in risk_titles if r not in selected_risks]
 
 # Strategy Suggestion
 if suggest_clicked:
