@@ -3,6 +3,25 @@ import pandas as pd
 import re
 from typing import List
 
+# Custom CSS for consistency with app.py
+st.markdown(
+    """
+    <style>
+    .stExpander > div, .card {
+        border: 1px solid #E5E7EB;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    .card {
+        background-color: #1E1F24;
+        padding: 20px;
+        margin-bottom: 16px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 def render_strategy_cards(df: pd.DataFrame) -> None:
     if df.empty:
         st.info("No strategies available.")
@@ -15,20 +34,20 @@ def render_strategy_cards(df: pd.DataFrame) -> None:
         headline = " ".join(headline_words) + "…"
         chosen = st.session_state.get("chosen_strategy") or {}
         selected = chosen.get("name") == row.name
-        box_color = "#10b981" if selected else "#334155"
+        box_color = "#10b981" if selected else "#60A5FA"
         with st.container():
             st.markdown(
                 f"""
-                <div style="border: 1px solid {box_color}; border-radius: 10px; padding: 16px; margin-bottom: 16px; background-color: #1e1f24;">
+                <div class="card" style="border: 1px solid {box_color};">
                 <div style="display:flex; justify-content: space-between; align-items:center;">
-                    <div style="font-size: 18px; font-weight: 600;">{headline}</div>
-                    <div style="font-size: 13px; background-color: #334155; color: #f8fafc; padding: 4px 10px; border-radius: 6px;">
+                    <div style="font-size: 20px; font-weight: 600;">{headline}</div>
+                    <div style="font-size: 14px; background-color: #334155; color: #f8fafc; padding: 4px 10px; border-radius: 6px;">
                         Variant {row.variant}
                     </div>
                 </div>
-                <div style="margin-top: 8px;">
-                    <b>Risk Reduction:</b> {row.risk_reduction_pct}%   
-                    <b>Cost:</b> {row.get("aggregate_cost_pct", 0):.1f}% of capital   
+                <div style="margin-top: 8px; line-height: 1.8;">
+                    <b>Risk Reduction:</b> {row.risk_reduction_pct}% &nbsp;
+                    <b>Cost:</b> {row.get("aggregate_cost_pct", 0):.1f}% of capital &nbsp;
                     <b>Horizon:</b> {row.get("horizon_months", "—")} months
                 </div>
                 <details style="margin-top: 12px; color: #e2e8f0;">
@@ -41,7 +60,7 @@ def render_strategy_cards(df: pd.DataFrame) -> None:
                         )}
                     </div>
                     <form method="post">
-                        <button type="submit" style="margin-top: 12px; padding: 6px 12px; background-color: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer;" name="select_strategy_{i}">✔️ Select this strategy</button>
+                        <button type="submit" style="margin-top: 12px; padding: 6px 12px; background-color: #1E3A8A; color: white; border: none; border-radius: 6px; cursor: pointer;" name="select_strategy_{i}">✔️ Select this strategy</button>
                     </form>
                 </details>
                 </div>
@@ -70,7 +89,7 @@ def render_rationale(df: pd.DataFrame) -> None:
         rat = row.get("Rationale", "No rationale provided").strip()
         src = row.get("Source", "").strip()
         card = (
-            f"<div style='background:#1e293b;padding:12px;border-radius:10px;margin-bottom:10px;color:#f1f5f9'>"
+            f"<div class='card' style='color:#f1f5f9'>"
             f"<b>{tick} ({pos})</b> — <span style='color:#22d3ee'>${amt:,.0f}</span><br>{rat}"
         )
         if re.match(r'^https?://', src):
