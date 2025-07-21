@@ -133,7 +133,7 @@ with st.expander("Upload Portfolio (CSV)", expanded=True):
     if up:
         try:
             raw = up.getvalue().decode('utf-8')
-            df = pd.read_csv(StringIO(raw), engine='python')
+            df = pd.read_csv(StringIO(raw), engine='python', on_bad_lines='warn')
         except Exception as e:
             st.error("Error parsing CSV.")
             st.exception(e)
