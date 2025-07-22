@@ -81,3 +81,39 @@ def render_strategy_cards(df: pd.DataFrame) -> None:
                 message = f"**Rationale for {strategy_name} (Variant: {row.variant}):**\n{rationale_text}"
                 st.session_state.history.append(("assistant", message))
                 st.rerun()
+
+def clean_md(md: str) -> str:
+    md = re.sub(r"(\d)(?=[A-Za-z])", r"\1 ", md)
+    return md.replace("*", "").replace("_", "")
+
+def render_rationale(df: pd.DataFrame) -> None:
+    if df.empty:
+        st.info("No hedge rationale to show.")
+        return
+
+    total = df["Amount ($)"].sum()
+    st.markdown(
+        f"A total of **${total:,.0f}** was allocated to hedge instruments "
+        "to mitigate key risks in the portfolio.\n\n"
+        "Below is the explanation for each hedge component:"
+    )
+
+    for _, row in df.iterrows():
+        tick   = row.get("Ticker", "—").strip()
+        pos    = row.get("Position", "—").title()
+        amt    = row.get("Amount ($)", 0)
+        rat    = row.get("Rationale", "No rationale provided").strip()
+        src    = row.get("Source", "").strip()
+
+        card  = (
+            f"<div style='background:#1e293b;padding:12px;border-radius:10px;"
+            f"margin-bottom:10px;color:#f1f5f9'>"
+            f"<b>{tick} ({pos})</b> — "
+            f"<span style='color:#22d3ee'>${amt:,.0f}</span><br>{rat}"
+        )
+
+        if re.match(r'^https?://', src):
+            card += f"<br><a href='{src}' target='_blank' style='color:#60a5fa;'>Source ↗</a>"
+
+        card += "</div>"
+        st.markdown(card, unsafe_allow_html=True)
