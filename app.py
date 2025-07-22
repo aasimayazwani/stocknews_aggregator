@@ -111,88 +111,133 @@ with st.sidebar.expander("🧹 Session Tools", expanded=False):
                     st.markdown("**Rationale**")
                     st.markdown(run["rationale_md"])
 
-    # Horizontal Action Icons Row
+    # Professional Action Buttons Row
     st.markdown("""
     <style>
-    .tool-row {
+    .professional-tools {
         display: flex;
-        justify-content: space-around;
+        justify-content: space-between;
         align-items: center;
-        margin: 16px 0;
-        gap: 8px;
+        margin: 20px 0;
+        gap: 12px;
+        padding: 16px;
+        background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+        border-radius: 12px;
+        border: 1px solid #334155;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
     }
-    .tool-icon {
+    .pro-button {
         position: relative;
-        display: inline-block;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 60px;
+        height: 60px;
+        border: 1px solid #475569;
+        border-radius: 10px;
+        background: linear-gradient(145deg, #334155, #1E293B);
+        color: #E2E8F0;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         cursor: pointer;
-        padding: 8px;
-        border-radius: 6px;
-        background: linear-gradient(135deg, #1E3A8A, #3B82F6);
-        color: white;
-        text-decoration: none;
-        font-size: 18px;
-        transition: all 0.2s ease;
-        border: none;
-        min-width: 40px;
-        text-align: center;
+        box-shadow: 
+            0 2px 8px rgba(0, 0, 0, 0.15),
+            inset 0 1px 0 rgba(255, 255, 255, 0.1);
     }
-    .tool-icon:hover {
-        background: linear-gradient(135deg, #1E40AF, #60A5FA);
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    .pro-button:hover {
+        transform: translateY(-2px) scale(1.05);
+        border-color: #06B6D4;
+        background: linear-gradient(145deg, #0891B2, #0E7490);
+        box-shadow: 
+            0 8px 25px rgba(6, 182, 212, 0.3),
+            inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        color: #F0F9FF;
     }
-    .tooltip {
-        visibility: hidden;
-        opacity: 0;
-        position: absolute;
-        bottom: 120%;
-        left: 50%;
-        transform: translateX(-50%);
-        background-color: #1F2937;
-        color: white;
-        text-align: center;
-        padding: 6px 10px;
-        border-radius: 6px;
-        font-size: 12px;
-        white-space: nowrap;
-        z-index: 999;
-        transition: opacity 0.2s;
-        border: 1px solid #374151;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    .pro-button:active {
+        transform: translateY(0) scale(1.02);
+        box-shadow: 
+            0 2px 8px rgba(6, 182, 212, 0.4),
+            inset 0 1px 3px rgba(0, 0, 0, 0.2);
     }
-    .tooltip::after {
-        content: "";
-        position: absolute;
-        top: 100%;
-        left: 50%;
-        margin-left: -5px;
-        border-width: 5px;
-        border-style: solid;
-        border-color: #1F2937 transparent transparent transparent;
+    .pro-icon {
+        font-size: 20px;
+        margin-bottom: 2px;
+        font-weight: 500;
     }
-    .tool-icon:hover .tooltip {
-        visibility: visible;
+    .pro-label {
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        opacity: 0.8;
+        line-height: 1;
+    }
+    .pro-button:hover .pro-label {
         opacity: 1;
+    }
+    
+    /* Streamlit button override */
+    div[data-testid="column"] .stButton > button {
+        width: 100% !important;
+        height: 60px !important;
+        border: 1px solid #475569 !important;
+        border-radius: 10px !important;
+        background: linear-gradient(145deg, #334155, #1E293B) !important;
+        color: #E2E8F0 !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 11px !important;
+        font-weight: 600 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
+        padding: 8px 4px !important;
+    }
+    div[data-testid="column"] .stButton > button:hover {
+        transform: translateY(-2px) scale(1.05) !important;
+        border-color: #06B6D4 !important;
+        background: linear-gradient(145deg, #0891B2, #0E7490) !important;
+        box-shadow: 0 8px 25px rgba(6, 182, 212, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+        color: #F0F9FF !important;
+    }
+    div[data-testid="column"] .stButton > button:active {
+        transform: translateY(0) scale(1.02) !important;
+        box-shadow: 0 2px 8px rgba(6, 182, 212, 0.4), inset 0 1px 3px rgba(0, 0, 0, 0.2) !important;
     }
     </style>
     """, unsafe_allow_html=True)
     
-    # Create columns for the buttons (4 buttons in a row)
+    # Create columns for professional buttons
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        suggest_clicked = st.button("🚀", key="suggest_btn", help="Suggest Strategy")
+        suggest_clicked = st.button("⚡\nGenerate", key="suggest_btn", help="Generate new hedge strategies")
     
     with col2:
-        clear_portfolio_clicked = st.button("🗑️", key="clear_portfolio_btn", help="Clear Portfolio")
+        show_history_clicked = st.button("📈\nHistory", key="show_history_btn", help="View strategy history")
     
     with col3:
-        clear_chat_clicked = st.button("🧽", key="clear_chat_btn", help="Clear Chat History")
+        clear_portfolio_clicked = st.button("🗂️\nReset", key="clear_portfolio_btn", help="Clear current portfolio")
     
     with col4:
-        clear_strategy_clicked = st.button("📊", key="clear_strategy_btn", help="Clear Strategy History")
+        clear_chat_clicked = st.button("💬\nClear", key="clear_chat_btn", help="Clear chat history")
     
     # Handle button clicks
+    if show_history_clicked:
+        if st.session_state.strategy_history:
+            st.subheader("📊 Strategy History")
+            for idx, run in enumerate(reversed(st.session_state.strategy_history), start=1):
+                with st.expander(f"Run {idx} — {run['timestamp']} | Horizon: {run['horizon']} mo", expanded=False):
+                    st.markdown(f"**Capital**: ${run['capital']:,.0f}  \n**Beta Band**: {run['beta_band'][0]}–{run['beta_band'][1]}")
+                    st.dataframe(run["strategy_df"], use_container_width=True)
+                    st.markdown("**Rationale**")
+                    st.markdown(run["rationale_md"])
+        else:
+            st.info("No strategy history available yet.")
+    
     if clear_portfolio_clicked:
         st.session_state.portfolio = []
         st.session_state.portfolio_alloc = {}
@@ -203,10 +248,6 @@ with st.sidebar.expander("🧹 Session Tools", expanded=False):
         st.session_state.history = []
         st.rerun()
     
-    if clear_strategy_clicked:
-        st.session_state.strategy_history = []
-        st.rerun()
-    
     # Additional controls
     st.slider(
         label="Backtest period (months):",
@@ -215,6 +256,11 @@ with st.sidebar.expander("🧹 Session Tools", expanded=False):
         value=st.session_state.backtest_duration,
         key="backtest_duration"
     )
+    
+    # Clear Strategy History button (separate since it's less commonly used)
+    if st.button("🗑️ Clear Strategy History", key="clear_strategy_btn"):
+        st.session_state.strategy_history = []
+        st.rerun()
 
 # ------------------ Main UI ------------------
 st.title("Equity Strategy Assistant")
