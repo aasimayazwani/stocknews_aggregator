@@ -207,11 +207,6 @@ with st.sidebar.expander("🧹 Session Tools", expanded=False):
         value=st.session_state.backtest_duration,
         key="backtest_duration"
     )
-    
-    # Clear Strategy History button (separate since it's less commonly used)
-    if st.button("🗑️ Clear Strategy History", key="clear_strategy_btn"):
-        st.session_state.strategy_history = []
-        st.rerun()
 
 # ------------------ Main UI ------------------
 st.title("Equity Strategy Assistant")
