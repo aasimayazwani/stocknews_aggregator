@@ -9,7 +9,15 @@ from backtest import backtest_strategy
 from config import DEFAULT_MODEL
 from openai_client import ask_openai
 
-st.set_page_config(page_title="Hedge Strategy Chatbot", layout="wide")
+layout = st.session_state.get("layout", "wide")
+st.set_page_config(page_title="Hedge Strategy Chatbot", layout=layout)
+
+# Sidebar to toggle layout (requires rerun)
+with st.sidebar:
+    new_layout = st.selectbox("Layout", ["wide", "centered"], index=0 if layout == "wide" else 1)
+    if new_layout != layout:
+        st.session_state.layout = new_layout
+        st.rerun()
 
 # ------------------------ Custom CSS ------------------------
 st.markdown(
