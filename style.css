@@ -1,0 +1,118 @@
+.stExpander > div {
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.stButton > button {
+    background-color: #1E3A8A;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 5px;
+}
+
+.stButton > button:hover {
+    background-color: #1E40AF;
+}
+
+.professional-tools {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 20px 0;
+    gap: 12px;
+    padding: 16px;
+    background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+    border-radius: 12px;
+    border: 1px solid #334155;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+.pro-button {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 60px;
+    height: 60px;
+    border: 1px solid #475569;
+    border-radius: 10px;
+    background: linear-gradient(145deg, #334155, #1E293B);
+    color: #E2E8F0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    box-shadow: 
+        0 2px 8px rgba(0, 0, 0, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.pro-button:hover {
+    transform: translateY(-2px) scale(1.05);
+    border-color: #06B6D4;
+    background: linear-gradient(145deg, #0891B2, #0E7490);
+    box-shadow: 
+        0 8px 25px rgba(6, 182, 212, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    color: #F0F9FF;
+}
+
+.pro-button:active {
+    transform: translateY(0) scale(1.02);
+    box-shadow: 
+        0 2px 8px rgba(6, 182, 212, 0.4),
+        inset 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.pro-icon {
+    font-size: 20px;
+    margin-bottom: 2px;
+    font-weight: 500;
+}
+
+.pro-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0.8;
+    line-height: 1;
+}
+
+.pro-button:hover .pro-label {
+    opacity: 1;
+}
+
+/* Streamlit button override in column layout */
+div[data-testid="column"] .stButton > button {
+    width: 100% !important;
+    height: 60px !important;
+    border: 1px solid #475569 !important;
+    border-radius: 10px !important;
+    background: linear-gradient(145deg, #334155, #1E293B) !important;
+    color: #E2E8F0 !important;
+    transition: all 0.3s cubic-bezier(0, 0, 0.2, 1) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    padding: 8px 4px !important;
+}
+
+div[data-testid="column"] .stButton > button:hover {
+    transform: translateY(-2px) scale(1.05) !important;
+    border-color: #06B6D4 !important;
+    background: linear-gradient(145deg, #0891B2, #0E7490) !important;
+    box-shadow: 0 8px 25px rgba(6, 182, 212, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+    color: #F0F9FF !important;
+}
+
+div[data-testid="column"] .stButton > button:active {
+    transform: translateY(0) scale(1.02) !important;
+    box-shadow: 0 2px 8px rgba(6, 182, 212, 0.4), inset 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+}
