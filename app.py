@@ -94,7 +94,11 @@ with st.sidebar.expander("📌 Investor Profile", expanded=False):
     )
 
 # ------------------ Sidebar: Session Tools ------------------
+# Replace the Session Tools section in app.py with this code:
+
+# ------------------ Sidebar: Session Tools ------------------
 with st.sidebar.expander("🧹 Session Tools", expanded=False):
+    # Previous Strategies Section (keep as is)
     with st.expander("🧠 Previous Strategies", expanded=True):
         if not st.session_state.strategy_history:
             st.info("No previous strategies yet.")
@@ -106,7 +110,96 @@ with st.sidebar.expander("🧹 Session Tools", expanded=False):
                     st.markdown("**Rationale**")
                     st.markdown(run["rationale_md"])
 
-    suggest_clicked = st.button("🚀 Suggest strategy")
+    # Horizontal Action Icons Row
+    st.markdown("""
+    <style>
+    .tool-row {
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        margin: 16px 0;
+        gap: 8px;
+    }
+    .tool-icon {
+        position: relative;
+        display: inline-block;
+        cursor: pointer;
+        padding: 8px;
+        border-radius: 6px;
+        background: linear-gradient(135deg, #1E3A8A, #3B82F6);
+        color: white;
+        text-decoration: none;
+        font-size: 18px;
+        transition: all 0.2s ease;
+        border: none;
+        min-width: 40px;
+        text-align: center;
+    }
+    .tool-icon:hover {
+        background: linear-gradient(135deg, #1E40AF, #60A5FA);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    }
+    .tooltip {
+        visibility: hidden;
+        opacity: 0;
+        position: absolute;
+        bottom: 120%;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: #1F2937;
+        color: white;
+        text-align: center;
+        padding: 6px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        white-space: nowrap;
+        z-index: 999;
+        transition: opacity 0.2s;
+        border: 1px solid #374151;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    .tooltip::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-left: -5px;
+        border-width: 5px;
+        border-style: solid;
+        border-color: #1F2937 transparent transparent transparent;
+    }
+    .tool-icon:hover .tooltip {
+        visibility: visible;
+        opacity: 1;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Create columns for the buttons
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        suggest_clicked = st.button("🚀", key="suggest_btn", help="Suggest Strategy")
+    
+    with col2:
+        clear_portfolio_clicked = st.button("🗑️", key="clear_portfolio_btn", help="Clear Portfolio")
+    
+    with col3:
+        clear_chat_clicked = st.button("🧽", key="clear_chat_btn", help="Clear Chat History")
+    
+    # Handle button clicks
+    if clear_portfolio_clicked:
+        st.session_state.portfolio = []
+        st.session_state.portfolio_alloc = {}
+        st.session_state.alloc_df = None
+        st.rerun()
+    
+    if clear_chat_clicked:
+        st.session_state.history = []
+        st.rerun()
+    
+    # Additional controls
     st.slider(
         label="Backtest period (months):",
         min_value=1,
@@ -114,14 +207,11 @@ with st.sidebar.expander("🧹 Session Tools", expanded=False):
         value=st.session_state.backtest_duration,
         key="backtest_duration"
     )
-    if st.button("🗑️ Clear Portfolio"):
-        st.session_state.portfolio = []
-        st.session_state.portfolio_alloc = {}
-        st.session_state.alloc_df = None
-    if st.button("🧽 Clear Chat History"):
-        st.session_state.history = []
-    if st.button("🗑️ Clear Strategy History"):
+    
+    # Clear Strategy History button (separate since it's less commonly used)
+    if st.button("🗑️ Clear Strategy History", key="clear_strategy_btn"):
         st.session_state.strategy_history = []
+        st.rerun()
 
 # ------------------ Main UI ------------------
 st.title("Equity Strategy Assistant")
