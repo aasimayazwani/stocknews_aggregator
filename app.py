@@ -95,6 +95,7 @@ with st.sidebar.expander("📌 Investor Profile", expanded=False):
 
 # ------------------ Sidebar: Session Tools ------------------
 # Replace the Session Tools section in app.py with this code:
+# Replace the Session Tools section in app.py with this code:
 
 # ------------------ Sidebar: Session Tools ------------------
 with st.sidebar.expander("🧹 Session Tools", expanded=False):
@@ -176,8 +177,8 @@ with st.sidebar.expander("🧹 Session Tools", expanded=False):
     </style>
     """, unsafe_allow_html=True)
     
-    # Create columns for the buttons
-    col1, col2, col3 = st.columns(3)
+    # Create columns for the buttons (4 buttons in a row)
+    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         suggest_clicked = st.button("🚀", key="suggest_btn", help="Suggest Strategy")
@@ -188,6 +189,9 @@ with st.sidebar.expander("🧹 Session Tools", expanded=False):
     with col3:
         clear_chat_clicked = st.button("🧽", key="clear_chat_btn", help="Clear Chat History")
     
+    with col4:
+        clear_strategy_clicked = st.button("📊", key="clear_strategy_btn", help="Clear Strategy History")
+    
     # Handle button clicks
     if clear_portfolio_clicked:
         st.session_state.portfolio = []
@@ -197,6 +201,10 @@ with st.sidebar.expander("🧹 Session Tools", expanded=False):
     
     if clear_chat_clicked:
         st.session_state.history = []
+        st.rerun()
+    
+    if clear_strategy_clicked:
+        st.session_state.strategy_history = []
         st.rerun()
     
     # Additional controls
