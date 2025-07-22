@@ -4,7 +4,6 @@ import re
 from openai_client import ask_openai
 from config import DEFAULT_MODEL
 
-
 def render_strategy_cards(df: pd.DataFrame) -> None:
     if df.empty:
         st.info("No strategies generated yet.")
@@ -48,23 +47,18 @@ def render_strategy_cards(df: pd.DataFrame) -> None:
                 key=f"select_strategy_{i}",
                 help="Select this strategy and get a brief explanation",
             ):
-                # Set the chosen strategy
+                st.session_state.selected_strategy_idx = i
                 st.session_state.chosen_strategy = row.to_dict()
                 st.session_state.strategy_df = df
 
-                # Prepare the prompt for OpenAI
                 strategy_name = row.get("name", "Unknown Strategy")
                 variant = row.get("variant", "Unknown Variant")
                 prompt = f"Provide a brief explanation of the hedging strategy '{strategy_name}' with variant '{variant}'."
-
-                # Call OpenAI to get the explanation
                 explanation = ask_openai(
                     model=DEFAULT_MODEL,
                     system_prompt="You are a financial expert providing brief explanations of hedging strategies.",
                     user_prompt=prompt,
                 )
-
-                # Append the explanation to the chat history
                 message = f"**Explanation for {strategy_name} (Variant: {variant}):**\n{explanation}"
                 st.session_state.history.append(("assistant", message))
                 st.rerun()
@@ -84,11 +78,9 @@ def render_strategy_cards(df: pd.DataFrame) -> None:
                 st.session_state.history.append(("assistant", message))
                 st.rerun()
 
-
 def clean_md(md: str) -> str:
     md = re.sub(r"(\d)(?=[A-Za-z])", r"\1 ", md)
     return md.replace("*", "").replace("_", "")
-
 
 def render_rationale(df: pd.DataFrame) -> None:
     if df.empty:
@@ -116,7 +108,7 @@ def render_rationale(df: pd.DataFrame) -> None:
             f"<span style='color:#22d3ee'>${amt:,.0f}</span><br>{rat}"
         )
 
-        if re.match(r"^https?://", src):
+        if re.match(r'^https?://', src):
             card += f"<br><a href='{src}' target='_blank' style='color:#60a5fa;'>Source ↗</a>"
 
         card += "</div>"
