@@ -172,7 +172,8 @@ if suggest_clicked:
         st.stop()
 
     total = sum(st.session_state.portfolio_alloc.values())
-    risks = "; ".join([t for t,_ in st.session_state.risk_cache.get(t,[]) for t in st.session_state.portfolio])
+    #risks = "; ".join([t for t,_ in st.session_state.risk_cache.get(t,[]) for t in st.session_state.portfolio])
+    risks = "; ".join([ risk for ticker in st.session_state.portfolio for risk, _ in st.session_state.risk_cache.get(ticker, [])])
 
     strat_df = generate_strategies(
         model=DEFAULT_MODEL,
