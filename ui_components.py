@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+from openai_client import ask_openai
+from config import DEFAULT_MODEL
 
 def render_strategy_cards(df: pd.DataFrame) -> None:
     if df.empty:
@@ -26,7 +28,7 @@ def render_strategy_cards(df: pd.DataFrame) -> None:
                   <div style="display:flex; justify-content:space-between; align-items:center;">
                     <div style="font-size:20px; font-weight:600;">{headline}</div>
                     <div style="font-size:14px; background:#334155; color:#F8FAFC; padding:4px 10px; border-radius:6px;">
-                      Variant {row.variant}
+                      Variant: {row.variant}
                     </div>
                   </div>
                   <div style="margin-top:8px; line-height:1.8;">
@@ -40,6 +42,32 @@ def render_strategy_cards(df: pd.DataFrame) -> None:
             )
 
             if st.button(
+                "✔️ Select this strategy",
+                key=f"select_strategy_{i}",
+                help="Select this strategy and get a brief explanation",
+            ):
+                # Set the chosen strategy
+                st.session_state.chosen_strategy = row.to_dict()
+                st.session_state.strategy_df = df
+                
+                # Prepare the prompt for OpenAI
+                strategy_name = row.get('name', 'Unknown Strategy')
+                variant = row.get('variant', 'Unknown Variant')
+                prompt = f"Provide a brief explanation of the hedging strategy '{strategy_name}' with variant '{variant}'."
+                
+                # Call OpenAI to get the explanation
+                explanation = ask_openai(
+                    model=DEFAULT_MODEL,
+                    system_prompt="You are a financial expert providing brief explanations of hedging strategies.",
+                    user_prompt=prompt
+                )
+                
+                # Append the explanation to the chat history
+                message = f"**Explanation for {strategy_name} (Variant: {variant}):**\n{explanation}"
+                st.session_state.history.append(("assistant", message))
+                st.rerun()
+
+            if st.button(
                 "📖 View Rationale",
                 key=f"view_rationale_{i}",
                 help="Display the rationale in the chat interface",
@@ -50,27 +78,6 @@ def render_strategy_cards(df: pd.DataFrame) -> None:
                     else "\n".join(f"- {s.strip()}." for s in str(raw_rationale).split('.') if s.strip())
                 )
                 strategy_name = row.get('name', 'Unknown Strategy')
-                message = f"**Rationale for {strategy_name} (Variant {row.variant}):**\n{rationale_text}"
+                message = f"**Rationale for {strategy_name} (Variant: {row.variant}):**\n{rationale_text}"
                 st.session_state.history.append(("assistant", message))
                 st.rerun()
-
-            if st.button(
-                "✔️ Select this strategy",
-                key=f"select_strategy_{i}",
-                help="Activate this strategy and unlock back-testing",
-            ):
-                st.session_state.chosen_strategy = row.to_dict()
-                st.session_state.strategy_df = df
-                st.rerun()
-
-def render_rationale(rationale: str | dict) -> None:
-    st.subheader("Rationale")
-    if isinstance(rationale, dict):
-        st.write(f"**Thesis**: {rationale.get('thesis', 'No thesis provided.')}")
-        st.write(f"**Trade-off**: {rationale.get('tradeoff', 'No trade-off provided.')}")
-    else:
-        st.write(rationale)
-
-def render_backtest_chart(df: pd.DataFrame) -> None:
-    st.subheader("Backtest Results")
-    st.line_chart(df)
