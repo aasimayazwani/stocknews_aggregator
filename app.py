@@ -2,7 +2,7 @@ from __future__ import annotations
 import streamlit as st
 import pandas as pd
 from io import StringIO
-from ui_components import render_strategy_cards, render_rationale, clean_md, render_backtest_chart
+from ui_components import render_strategy_cards, clean_md, render_backtest_chart
 from utils import search_tickers, fetch_prices, web_risk_scan, fetch_backtest_data
 from strategy_generator import generate_strategies
 from backtest import backtest_strategy
