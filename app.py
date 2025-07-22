@@ -33,7 +33,12 @@ defaults = {
     "strategy_history": [],
     "strategy_df": pd.DataFrame(),
     "backtest_duration": 12,
-    "selected_strategy_idx": None
+    "selected_strategy_idx": None,
+    "prev_exp": None,
+    "allowed_instruments": [],
+    "experience_level": "Expert",
+    "explanation_pref": "Just the strategy",
+    "time_horizon": 6
 }
 for k, v in defaults.items():
     if k not in st.session_state:
@@ -69,42 +74,15 @@ with st.sidebar:
         st.session_state.prev_exp = curr_exp
     st.multiselect("Allowed hedge instruments:", all_instr, default=st.session_state.allowed_instruments, key="allowed_instruments")
 
-# Sidebar: Session Tools
-with st.sidebar:
     st.markdown("### 🧹 Session Tools")
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        suggest_clicked = st.button("⚡\nGenerate", key="suggest_btn")
-    with col2:
-        show_history_clicked = st.button("📈\nHistory", key="show_history_btn")
-    with col3:
-        clear_portfolio_clicked = st.button("🗂️\nReset", key="clear_portfolio_btn")
-    with col4:
-        clear_chat_clicked = st.button("💬\nClear", key="clear_chat_btn")
-
-    if show_history_clicked:
-        if st.session_state.strategy_history:
-            st.subheader("📊 Strategy History")
-            for idx, run in enumerate(reversed(st.session_state.strategy_history), 1):
-                with st.expander(f"Run {idx} — {run['timestamp']} | Horizon: {run['horizon']} mo"):
-                    st.markdown(f"**Capital**: ${run['capital']:,.0f}  \n**Beta Band**: {run['beta_band'][0]}–{run['beta_band'][1]}")
-                    st.dataframe(run["strategy_df"], use_container_width=True)
-                    st.markdown("**Rationale**")
-                    st.markdown(run["rationale_md"])
-        else:
-            st.info("No strategy history available yet.")
-
-    if clear_portfolio_clicked:
+    st.slider("Backtest period (months):", 1, 24, st.session_state.backtest_duration, key="backtest_duration")
+    if st.button("🗂️ Reset Portfolio", key="clear_portfolio_btn"):
         for k in ["portfolio", "portfolio_alloc", "alloc_df"]:
             st.session_state[k] = [] if k != "alloc_df" else None
         st.rerun()
-
-    if clear_chat_clicked:
+    if st.button("💬 Clear Chat", key="clear_chat_btn"):
         st.session_state.history = []
         st.rerun()
-
-    st.slider("Backtest period (months):", 1, 24, st.session_state.backtest_duration, key="backtest_duration")
-
     if st.button("🗑️ Clear Strategy History", key="clear_strategy_btn"):
         st.session_state.strategy_history = []
         st.rerun()
@@ -150,7 +128,7 @@ with st.expander("Upload Portfolio (CSV)", expanded=True):
         st.stop()
 
 # Strategy Generation
-if suggest_clicked:
+if st.button("⚡ Generate", key="suggest_btn"):
     if not st.session_state.portfolio_alloc:
         st.warning("No portfolio — cannot suggest strategies.")
         st.stop()
