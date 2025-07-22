@@ -9,7 +9,7 @@ from backtest import backtest_strategy
 from config import DEFAULT_MODEL
 from openai_client import ask_openai
 
-st.set_page_config(page_title="Hedge Strategy Chatbot", layout="centered")
+st.set_page_config(page_title="Hedge Strategy Chatbot", layout="wide")
 
 # ------------------------ Custom CSS ------------------------
 st.markdown(
