@@ -40,7 +40,8 @@ for k, v in defaults.items():
         st.session_state[k] = v
 
 # Sidebar: Investor Profile
-with st.sidebar.expander("📌 Investor Profile", expanded=False):
+with st.sidebar:
+    st.markdown("### 📌 Investor Profile")
     st.selectbox(
         label="Investor experience",
         options=["Beginner", "Intermediate", "Expert"],
@@ -69,7 +70,8 @@ with st.sidebar.expander("📌 Investor Profile", expanded=False):
     st.multiselect("Allowed hedge instruments:", all_instr, default=st.session_state.allowed_instruments, key="allowed_instruments")
 
 # Sidebar: Session Tools
-with st.sidebar.expander("🧹 Session Tools", expanded=False):
+with st.sidebar:
+    st.markdown("### 🧹 Session Tools")
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         suggest_clicked = st.button("⚡\nGenerate", key="suggest_btn")
