@@ -69,8 +69,6 @@ def render_strategy_cards(df: pd.DataFrame) -> None:
 
     st.markdown("""</div>""", unsafe_allow_html=True)
 
-
-
 def clean_md(md: str) -> str:
     """
     Cleans Markdown text by adding spaces after digits followed by letters
