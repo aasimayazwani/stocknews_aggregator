@@ -6,118 +6,66 @@ from config import DEFAULT_MODEL
 
 def render_strategy_cards(df: pd.DataFrame) -> None:
     """
-    Renders a grid of strategy cards with hover-activated details.
-    Each card displays key strategy metrics and, on hover, reveals a "View Details" overlay.
-    Clicking the card sets a URL parameter to trigger detailed explanation and rationale
-    in the main application logic.
+    Render a condensed 1-row or 2-row layout of hedge strategies with only one hover action over the strategy name.
+    Hovering over the name will display a button to select the strategy.
     """
     if df.empty:
         st.info("No strategies generated yet.")
         return
 
-    # Use Streamlit columns for a horizontal layout (e.g., 2 columns)
-    # Adjust num_columns as needed for desired layout (e.g., 1, 2, 3)
-    num_columns = 2
+    # Set number of rows and columns
+    num_columns = min(len(df), 4)  # adjust depending on screen size/responsiveness
     columns = st.columns(num_columns)
 
     for i, row in df.iterrows():
-        raw_rationale = row.rationale
-        thesis = (
-            raw_rationale.get("thesis")
-            if isinstance(raw_rationale, dict)
-            else str(raw_rationale)
-        )
-        # Create a short headline from the thesis for display
-        headline = " ".join(thesis.split()[:5]) + "…"
+        col = columns[i % num_columns]
+        with col:
+            chosen = st.session_state.get("chosen_strategy") or {}
+            selected = chosen.get("name") == row.name
+            border = "#10b981" if selected else "#60A5FA"
 
-        chosen = st.session_state.get("chosen_strategy") or {}
-        # Determine border color based on whether the strategy is currently selected
-        selected = chosen.get("name") == row.name
-        border = "#10b981" if selected else "#60A5FA"
+            headline = str(row.rationale.get("thesis", row.rationale))
+            short_title = " ".join(headline.split()[:5]) + "…"
 
-        # Place each card in its respective column, cycling through columns
-        with columns[i % num_columns]:
-            # Custom HTML and CSS for the strategy card with hover effect
-            # The 'onclick' event modifies the URL query parameters, which Streamlit detects
-            # and triggers a rerun, allowing Python logic to react.
             st.markdown(
                 f"""
                 <style>
-                    /* Basic styling for the strategy card */
-                    .strategy-card {{
-                        border: 1px solid {border};
-                        padding: 1em;
-                        margin-bottom: 1em;
-                        border-radius: 10px; /* Rounded corners for the card */
-                        cursor: pointer; /* Indicate interactivity */
-                        position: relative;
-                        overflow: hidden; /* Ensures the hover overlay stays within bounds */
-                        transition: all 0.2s ease-in-out; /* Smooth transition for hover effects */
-                        background-color: #1a202c; /* Dark background for the card */
-                        color: #f1f5f9; /* Light text color */
-                    }}
-                    /* Hover effect: slight lift and shadow */
-                    .strategy-card:hover {{
-                        transform: translateY(-5px);
-                        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-                    }}
-                    /* Styling for the hidden overlay that appears on hover */
-                    .strategy-card .hover-overlay {{
-                        position: absolute;
-                        top: 0;
-                        left: 0;
-                        width: 100%;
-                        height: 100%;
-                        background: rgba(0, 0, 0, 0.7); /* Semi-transparent dark overlay */
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        opacity: 0; /* Initially hidden */
-                        transition: opacity 0.3s ease; /* Smooth fade-in/out */
-                        border-radius: 10px; /* Match card border-radius */
-                    }}
-                    /* Make overlay visible on card hover */
-                    .strategy-card:hover .hover-overlay {{
-                        opacity: 1;
-                    }}
-                    /* Styling for the text inside the hover overlay */
-                    .hover-text {{
-                        color: white;
-                        font-size: 1.2em;
-                        font-weight: bold;
-                        text-align: center;
-                    }}
-                    /* General text styling for card content */
-                    .strategy-card b {{
-                        color: #cbd5e1; /* Slightly lighter bold text */
-                    }}
+                .strategy-name-{i} {{
+                    font-weight: bold;
+                    font-size: 16px;
+                    color: #f8fafc;
+                    background: #1e293b;
+                    padding: 6px 10px;
+                    border: 1px solid {border};
+                    border-radius: 8px;
+                    margin: 6px 0;
+                    position: relative;
+                    cursor: pointer;
+                }}
+                .strategy-name-{i}:hover .select-button-{i} {{
+                    display: block;
+                }}
+                .select-button-{i} {{
+                    display: none;
+                    position: absolute;
+                    top: 100%;
+                    left: 0;
+                    margin-top: 4px;
+                    background: #1e40af;
+                    color: white;
+                    padding: 4px 12px;
+                    font-size: 12px;
+                    border-radius: 6px;
+                }}
                 </style>
-                <div class="strategy-card" onclick="
-                    // JavaScript to set a query parameter in the URL
-                    // Streamlit will detect this change and rerun the app,
-                    // allowing Python code to process the selection.
-                    const url = new URL(window.location);
-                    url.searchParams.set('selected_strategy_idx', {i});
-                    window.location.href = url.toString();
-                ">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <div style="font-size:20px; font-weight:600; color:#f1f5f9;">{headline}</div>
-                        <div style="font-size:14px; background:#334155; color:#F8FAFC; padding:4px 10px; border-radius:6px;">
-                            Variant: {row.variant}
-                        </div>
-                    </div>
-                    <div style="margin-top:8px; line-height:1.8; color:#cbd5e1;">
-                        <b>Risk Reduction:</b> {row.risk_reduction_pct}%
-                        <b>Cost:</b> {row.get('aggregate_cost_pct',0):.1f}%
-                        <b>Horizon:</b> {row.get('horizon_months','—')} mo
-                    </div>
-                    <div class="hover-overlay">
-                        <span class="hover-text">View Details</span>
-                    </div>
+                <div class="strategy-name-{i}" onclick="window.location.search = '?selected_strategy_idx={i}';">
+                    {short_title}
+                    <div class="select-button-{i}">Select Strategy</div>
                 </div>
                 """,
-                unsafe_allow_html=True,
+                unsafe_allow_html=True
             )
+
 
 def clean_md(md: str) -> str:
     """
